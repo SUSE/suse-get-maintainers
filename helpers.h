@@ -195,6 +195,15 @@ namespace {
 		ret = std::move(paths);
 		return ret;
 	}
+
+	void try_to_fetch_env(std::string &var, const std::string &name)
+	{
+		if (var.empty()) {
+			const char *ptr = std::getenv(name.c_str());
+			if (ptr)
+				var = ptr;
+		}
+	}
 }
 
 #endif

@@ -80,21 +80,15 @@ int main(int argc, char **argv)
 		return 0;
 	}
 
+	try_to_fetch_env(gm.vulns, "VULNS_GIT");
+	try_to_fetch_env(gm.kernel_tree, "LINUX_GIT");
+
 	load_maintainers_file(maintainers, suse_users, gm.maintainers);
+	//load_upstream_maintainers_file(gm.kernel_tree);
 
 	if (gm.refresh) {
-		if (gm.vulns.empty()) {
-			const char *vulns_tree_dir = std::getenv("VULNS_GIT");
-			if (vulns_tree_dir)
-				gm.vulns = vulns_tree_dir;
-		}
 		if (!gm.vulns.empty())
 			fetch_repo(gm.vulns, "origin");
-		if (gm.kernel_tree.empty()) {
-			const char *linux_tree_dir = std::getenv("LINUX_GIT");
-			if (linux_tree_dir)
-				gm.kernel_tree = linux_tree_dir;
-		}
 		if (!gm.kernel_tree.empty())
 			fetch_repo(gm.kernel_tree, "origin");
 	}
@@ -186,13 +180,8 @@ int main(int argc, char **argv)
 
 	if (!gm.cves.empty() || gm.all_cves) {
 		has_cves = true;
-		if (gm.vulns.empty()) {
-			const char *vulns_tree_dir = std::getenv("VULNS_GIT");
-			if (vulns_tree_dir)
-				gm.vulns = vulns_tree_dir;
-			else
-				fail_with_message("Provide a path to kernel vulns database git tree either via -v or $VULNS_GIT");
-		}
+		if (gm.vulns.empty())
+			fail_with_message("Provide a path to kernel vulns database git tree either via -v or $VULNS_GIT");
 
 		if (!cve_hash_map.load(gm.vulns))
 			fail_with_message("Unable to load kernel vulns database git tree: ", gm.vulns);
@@ -227,13 +216,8 @@ int main(int argc, char **argv)
 	}
 
 	if (!gm.shas.empty()) {
-		if (gm.kernel_tree.empty()) {
-			const char *kernel_tree_dir = std::getenv("LINUX_GIT");
-			if (kernel_tree_dir)
-				gm.kernel_tree = kernel_tree_dir;
-			else
-				fail_with_message("Provide a path to mainline git kernel tree either via -k or $LINUX_GIT");
-		}
+		if (gm.kernel_tree.empty())
+			fail_with_message("Provide a path to mainline git kernel tree either via -k or $LINUX_GIT");
 
 		Repo rk;
 		if (rk.from_path(gm.kernel_tree))
