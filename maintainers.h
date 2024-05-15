@@ -109,31 +109,6 @@ namespace {
 		std::vector<Pattern> m_patterns;
 	};
 
-	void process_maitainers_file(std::vector<Stanza> &maintainers, std::set<std::string> &suse_users, const std::vector<std::string> lines)
-	{
-		Stanza st;
-		for (const auto &s: lines) {
-			if (s[1] == ':') {
-				if (s[0] == 'M')
-					st.add_maintainer(s, suse_users);
-				else if (s[0] == 'F') {
-					std::string fpattern = trim(s.substr(2));
-					if (fpattern.empty())
-						emit_message("MAINTAINERS entry: ", s);
-					else
-						st.add_pattern(std::move(fpattern));
-				}
-			} else {
-				if (!st.empty())
-					maintainers.push_back(std::move(st));
-				st.name = s;
-			}
-		}
-		if (!st.empty())
-			maintainers.push_back(std::move(st));
-
-	}
-
 	void load_maintainers_file(std::vector<Stanza> &maintainers, std::set<std::string> &suse_users, const std::string &filename)
 	{
 		std::ifstream file{filename};
@@ -141,18 +116,32 @@ namespace {
 		if (!file.is_open())
 			fail_with_message("Unable to open MAINTAINERS file: ", filename);
 
-		std::vector<std::string> lines;
+		Stanza st;
 		for (std::string line; getline(file, line);) {
 			std::string tmp = trim(line);
 			if (tmp.size() < 2)
 				continue;
-			lines.push_back(std::move(tmp));
+			if (tmp[1] == ':') {
+				if (tmp[0] == 'M')
+					st.add_maintainer(tmp, suse_users);
+				else if (tmp[0] == 'F') {
+					std::string fpattern = trim(tmp.substr(2));
+					if (fpattern.empty())
+						emit_message("MAINTAINERS entry: ", tmp);
+					else
+						st.add_pattern(std::move(fpattern));
+				}
+			} else {
+				if (!st.empty())
+					maintainers.push_back(std::move(st));
+				st.name = tmp;
+			}
 		}
+		if (!st.empty())
+			maintainers.push_back(std::move(st));
 
-		if (lines.empty())
+		if (maintainers.empty())
 			fail_with_message(filename, " appears to be empty");
-		else
-			process_maitainers_file(maintainers, suse_users, lines);
 	}
 }
 
