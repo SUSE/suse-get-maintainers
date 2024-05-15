@@ -1,8 +1,9 @@
 #include <fstream>
 #include <string>
 #include <set>
-#include <getopt.h>
+#include <optional>
 #include <cstdio>
+#include <getopt.h>
 
 #include "helpers.h"
 #include "git2.h"
@@ -18,10 +19,11 @@ namespace {
 	void json_output(const Stanza &m, const std::string&);
 	void show_person(const Person &, const std::string &, bool);
 	std::set<std::string> read_stdin_sans_new_lines();
-	void for_all_maintainers(std::vector<Stanza> &ml,
-				 const std::set<std::string> &paths,
-				 std::function<void(const Stanza &, const std::string &)> pretty_printer,
-				 const std::string &what);
+	void for_all_stanzas(const std::vector<Stanza> &,
+			     const std::vector<Stanza> &,
+			     const std::set<std::string> &,
+			     std::function<void(const Stanza &, const std::string &)>,
+			     const std::string &);
 
 	struct gm {
 		gm() : year(0), rejected(false), all_cves(false), json(false), names(false), from_stdin(false), trace(false), refresh(false), init(false) {}
@@ -51,6 +53,7 @@ int main(int argc, char **argv)
 
 	LibGit2 libgit2_state;
 	std::vector<Stanza> maintainers;
+	std::vector<Stanza> upstream_maintainers;
 	std::set<std::string> suse_users;
 
 	parse_options(argc, argv);
@@ -84,7 +87,8 @@ int main(int argc, char **argv)
 	try_to_fetch_env(gm.kernel_tree, "LINUX_GIT");
 
 	load_maintainers_file(maintainers, suse_users, gm.maintainers);
-	//load_upstream_maintainers_file(gm.kernel_tree);
+	if (!gm.kernel_tree.empty())
+		load_upstream_maintainers_file(upstream_maintainers, suse_users, gm.kernel_tree);
 
 	if (gm.refresh) {
 		if (!gm.vulns.empty())
@@ -110,12 +114,12 @@ int main(int argc, char **argv)
 					what += "\t{\n\t\t\"path\": \"" + p + "\"";
 				} else
 					what = p;
-				for_all_maintainers(maintainers, std::set<std::string>{p}, gm.json ? json_output : csv_output, what);
+				for_all_stanzas(maintainers, upstream_maintainers, std::set<std::string>{p}, gm.json ? json_output : csv_output, what);
 			}
 			if (gm.json)
 				std::cout << "\n]" << std::endl;
 		} else
-			for_all_maintainers(maintainers, gm.paths, show_emails, "");
+			for_all_stanzas(maintainers, upstream_maintainers, gm.paths, show_emails, "");
 		return 0;
 	}
 
@@ -151,7 +155,7 @@ int main(int argc, char **argv)
 								     ? "an " : "a ", to_string(sb.role));
 						show_person(sb, what, false);
 					} else
-						for_all_maintainers(maintainers, std::get<std::set<std::string>>(s), gm.json ? json_output : csv_output, what);
+						for_all_stanzas(maintainers, upstream_maintainers, std::get<std::set<std::string>>(s), gm.json ? json_output : csv_output, what);
 				} catch (...) { continue; }
 			}
 			if (gm.json)
@@ -170,7 +174,7 @@ int main(int argc, char **argv)
 						     ? "an " : "a ", to_string(sb.role));
 				show_person(sb, "", true);
 			} else
-				for_all_maintainers(maintainers, std::get<std::set<std::string>>(s), show_emails, "");
+				for_all_stanzas(maintainers, upstream_maintainers, std::get<std::set<std::string>>(s), show_emails, "");
 		}
 		return 0;
 	}
@@ -240,7 +244,9 @@ int main(int argc, char **argv)
 		if (gm.json)
 			std::cout << "[\n";
 
-		search_commit(rk, gm.shas, suse_users, [&maintainers, &has_cves, &first, &cve_hash_map, simple](const std::string &sha, const Person &sb, const std::set<std::string> &paths) {
+		search_commit(rk, gm.shas, suse_users,
+			      [&maintainers, &upstream_maintainers, &has_cves, &first, &cve_hash_map, simple]
+			      (const std::string &sha, const Person &sb, const std::set<std::string> &paths) {
 			if (gm.trace && !paths.empty()) {
 				std::cerr << "SHA " << sha << " contains the following paths: " << std::endl;
 				for (const auto &p: paths)
@@ -264,7 +270,7 @@ int main(int argc, char **argv)
 					emit_message("We have ", sb.role == Role::Author || sb.role == Role::AckedBy ? "an " : "a ", to_string(sb.role));
 				show_person(sb, what, simple);
 			} else
-				for_all_maintainers(maintainers, paths, simple ? show_emails : gm.json ? json_output : csv_output, what);
+				for_all_stanzas(maintainers, upstream_maintainers, paths, simple ? show_emails : gm.json ? json_output : csv_output, what);
 		});
 		if (gm.json)
 			std::cout << "\n]" << std::endl;
@@ -504,34 +510,49 @@ namespace {
 		return ret;
 	}
 
-	void for_all_maintainers(std::vector<Stanza> &ml,
-				 const std::set<std::string> &paths,
-				 std::function<void(const Stanza &, const std::string &)> pretty_printer,
-				 const std::string &what)
+	std::optional<const Stanza *> find_best_match(const std::vector<Stanza> &sl, const std::set<std::string> &paths)
 	{
+		std::optional<const Stanza *> ret;
 		unsigned best_weight = 0;
-		bool found = false;
-		std::vector<Stanza>::size_type midx = 0;
-		for(std::vector<Stanza>::size_type i = 0; i < ml.size(); ++i) {
+		for(const auto &s: sl) {
 			unsigned weight = 0;
-			for (const auto &path: paths) {
-				weight += ml[i].match_path(path);
-			}
+			for (const auto &path: paths)
+				weight += s.match_path(path);
 			if (weight > best_weight) {
-				found = true;
+				ret.emplace(&s);
 				best_weight = weight;
-				midx = i;
 			}
 		}
-		if (found) {
+		return ret;
+	}
+
+	void for_all_stanzas(const std::vector<Stanza> &suse_stanzas,
+			     const std::vector<Stanza> &upstream_stanzas,
+			     const std::set<std::string> &paths,
+			     std::function<void(const Stanza &, const std::string &)> pretty_printer,
+			     const std::string &what)
+	{
+		std::optional<const Stanza *> stanza = find_best_match(suse_stanzas, paths);
+
+		if (stanza.has_value()) {
 			if (gm.trace)
-				std::cerr << "STANZA: " << ml[midx].name << std::endl;
-			pretty_printer(ml[midx], what);
-		} else {
-			thread_local auto catch_all_maintainer = Stanza{"Base", "F: Kernel Developers at SuSE <kernel@suse.de>"};
-			if (gm.trace)
-				std::cerr << "STANZA: " << catch_all_maintainer.name << std::endl;
-			pretty_printer(catch_all_maintainer, what);
+				std::cerr << "STANZA: " << stanza.value()->name << std::endl;
+			pretty_printer(*stanza.value(), what);
+			return;
 		}
+
+		stanza = find_best_match(upstream_stanzas, paths);
+
+		if (stanza.has_value()) {
+			if (gm.trace)
+				std::cerr << "Upstream STANZA: " << stanza.value()->name << std::endl;
+			pretty_printer(*stanza.value(), what);
+			return;
+		}
+
+		thread_local auto catch_all_maintainer = Stanza{"Base", "F: Kernel Developers at SuSE <kernel@suse.de>"};
+		if (gm.trace)
+			std::cerr << "STANZA: " << catch_all_maintainer.name << std::endl;
+		pretty_printer(catch_all_maintainer, what);
 	}
 }

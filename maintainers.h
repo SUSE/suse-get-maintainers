@@ -78,7 +78,7 @@ namespace {
 				return std::accumulate(m_patterns.cbegin(), m_patterns.cend(), 0u,
 						       [&path](unsigned m, const Pattern &p) { return std::max(m, p.match(path)); });
 			}
-		void add_maintainer(const std::string_view maintainer, std::set<std::string> &suse_users)
+		void add_maintainer_and_store(const std::string_view maintainer, std::set<std::string> &suse_users)
 			{
 				Person m{Role::Maintainer};
 				if (parse_person(maintainer, m.name, m.email)) {
@@ -86,6 +86,15 @@ namespace {
 					m_maintainers.push_back(std::move(m));
 				} else
 					emit_message("MAINTAINERS: contact ", maintainer, " cannot be parsed into name and email!");
+			}
+		void add_maintainer_if(const std::string_view maintainer, const std::set<std::string> &suse_users)
+			{
+				Person m{Role::Upstream};
+				if (parse_person(maintainer, m.name, m.email)) {
+					if (suse_users.contains(m.email.substr(0, m.email.find("@"))))
+						m_maintainers.push_back(std::move(m));
+				} else
+					emit_message("Upstream MAINTAINERS: contact ", maintainer, " cannot be parsed into name and email!");
 			}
 		void add_pattern(const std::string_view pattern) { m_patterns.push_back(Pattern(pattern)); }
 		bool empty() const
@@ -104,6 +113,7 @@ namespace {
 					m_maintainers.push_back(std::move(m));
 			}
 		Stanza() = default;
+		void new_entry(const std::string_view n) { name = n; m_maintainers.clear(); m_patterns.clear(); }
 		std::string name;
 	private:
 		std::vector<Person> m_maintainers;
@@ -124,7 +134,7 @@ namespace {
 				continue;
 			if (tmp[1] == ':') {
 				if (tmp[0] == 'M')
-					st.add_maintainer(tmp, suse_users);
+					st.add_maintainer_and_store(tmp, suse_users);
 				else if (tmp[0] == 'F') {
 					std::string_view fpattern = trim(tmp.substr(2));
 					if (fpattern.empty())
@@ -135,7 +145,7 @@ namespace {
 			} else {
 				if (!st.empty())
 					maintainers.push_back(std::move(st));
-				st.name = tmp;
+				st.new_entry(tmp);
 			}
 		}
 		if (!st.empty())
@@ -143,6 +153,82 @@ namespace {
 
 		if (maintainers.empty())
 			fail_with_message(filename, " appears to be empty");
+	}
+
+	void load_upstream_maintainers_file(std::vector<Stanza> &stanzas, const std::set<std::string> &suse_users, const std::string &lsource)
+	{
+		Repo linux_repo;
+
+		if (linux_repo.from_path(lsource))
+			fail_with_message("Unable to open linux.git at ", lsource, " ;", git_error_last()->message);
+
+		const std::string error_message = "Unable to load linux.git tree for origin/master; ";
+
+		Object obj;
+		if (obj.from_rev(linux_repo, "origin/master"))
+			fail_with_message(error_message, git_error_last()->message);
+
+		Commit commit;
+		if (commit.from_oid(linux_repo, git_object_id(obj.get())))
+			fail_with_message(error_message, git_error_last()->message);
+
+		Tree commit_tree;
+		if (commit_tree.from_commit(commit))
+			fail_with_message(error_message, git_error_last()->message);
+
+		FilesContents fc;
+		if (fc.from_tree_and_path(commit_tree, "MAINTAINERS"))
+			fail_with_message(error_message, git_error_last()->message);
+
+		std::istringstream upstream_maintainters_file(fc.m_contents["MAINTAINERS"]);
+		Stanza st;
+		bool skip = true;
+		for (std::string line; getline(upstream_maintainters_file, line); ) {
+			if (skip) {
+				if (line.starts_with("Maintainers List"))
+					skip = false;
+				continue;
+			}
+			if (line == "THE REST")
+				break;
+			if (line.size() < 3 || line[1] == '.' || line[1] == '\t' || line[1] == ' ' || line[1] == '.' || line[1] == '-')
+				continue;
+			if (line[1] == ':')
+				switch(line[0]) {
+				case 'L': // TODO?
+				case 'S':
+				case 'W':
+				case 'Q':
+				case 'B':
+				case 'C':
+				case 'P':
+				case 'T':
+				case 'X':
+				case 'N': // TODO, huh?
+				case 'K':
+					break;
+				case 'M':
+				case 'R':
+					st.add_maintainer_if(line, suse_users);
+					break;
+				case 'F':
+					std::string_view fpattern = trim(std::string_view(line).substr(2));
+					if (fpattern.empty())
+						emit_message("Upstream MAINTAINERS entry: ", line);
+					else
+						st.add_pattern(fpattern);
+					break;
+				}
+			else {
+				if (!st.empty())
+					stanzas.push_back(std::move(st));
+				st.new_entry("Upstream: " + line);
+			}
+		}
+		if (!st.empty())
+			stanzas.push_back(std::move(st));
+		if (stanzas.empty())
+			fail_with_message("Upstream MAINTAINERS appears to be empty");
 	}
 }
 

@@ -62,7 +62,7 @@ namespace {
 			throw 0;
 
 		FilesContents fc;
-		if (fc.from_tree(commit_tree, files))
+		if (fc.from_tree_and_files(commit_tree, files))
 			fail_with_message(error_message, git_error_last()->message);
 
 		const auto regex_cve_number = std::regex("CVE-[0-9][0-9][0-9][0-9]-[0-9]+", std::regex::optimize);

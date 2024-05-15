@@ -38,6 +38,11 @@ suse\-get\-maintainers is not even looking further and reports that
 person as a maintainer regardless of what is in the MAINTAINERS file
 for the files touched by the commit/patch.
 
+If the potential maintainers are found neither in commit/patch nor in
+the suse MAINTAINERS file, the upstream MAINTAINERS file is searched,
+provided the path to the upstream repo is known (via \-k or
+$LINUX_GIT).
+
 In the CSV and JSON reports the role or the subsystem are clearly stated.
 
 .SH OPTIONS
@@ -259,9 +264,8 @@ $ suse\-get\-maintainers \-iv /tmp/vulns
 
 .SH TODO
 Fetch supported branches automatically and search SUSE patches in them
-for potential maintainers.  Parse upstream MAINTAINERS file.  Fetch a
-mapping from usernames to LDAP usernames and ask LDAP with curl for a
-bugzilla email.
+for potential maintainers.  Fetch a mapping from usernames to LDAP
+usernames and ask LDAP with curl for a bugzilla email.
 
 .SH AUTHORS
 

@@ -211,14 +211,30 @@ namespace {
 		std::unordered_map<std::string, git_oid> m_paths;
 	};
 
+	struct TreeEntry
+	{
+		TreeEntry() : te(nullptr) {}
+		~TreeEntry() { git_tree_entry_free(te); }
+		git_tree_entry *te;
+	};
+
 	struct Blob
 	{
 		Blob() : m_blob(nullptr) {}
 		~Blob() { git_blob_free(m_blob); }
 		int from_tree(Tree &tree, const git_oid *id)
 			{
-				git_repository *repo = git_tree_owner(tree.get());
-				return git_blob_lookup(&m_blob, repo, id);
+				return git_blob_lookup(&m_blob, git_tree_owner(tree.get()), id);
+			}
+		int from_tree_and_path(Tree &tree, const std::string &s)
+			{
+				int err;
+				TreeEntry te;
+				if ((err = git_tree_entry_bypath(&te.te, tree.get(), s.c_str())))
+					return err;
+				if (GIT_OBJECT_BLOB != git_tree_entry_type(te.te))
+					return GIT_ENOTFOUND;
+				return git_blob_lookup(&m_blob, git_tree_owner(tree.get()), git_tree_entry_id(te.te));
 			}
 		git_blob *get() const { return m_blob; }
 	private:
@@ -227,7 +243,7 @@ namespace {
 
 	struct FilesContents
 	{
-		int from_tree(Tree &tree, const Files &files)
+		int from_tree_and_files(Tree &tree, const Files &files)
 			{
 				bool errors = false;
 				for (const auto &p: files.m_paths) {
@@ -240,6 +256,15 @@ namespace {
 					m_contents.insert(std::make_pair(p.first, std::string(static_cast<const char *>(git_blob_rawcontent(b.get())))));
 				}
 				return m_contents.empty() && errors ? 1 : 0;
+			}
+		int from_tree_and_path(Tree &tree, const std::string &s)
+			{
+				int err;
+				Blob b;
+				if((err = b.from_tree_and_path(tree, s.c_str())))
+					return err;
+				m_contents.insert(std::make_pair(s, std::string(static_cast<const char *>(git_blob_rawcontent(b.get())))));
+				return 0;
 			}
 		std::unordered_map<std::string, std::string> m_contents;
 	};
