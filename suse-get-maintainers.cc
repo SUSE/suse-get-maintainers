@@ -499,7 +499,7 @@ namespace {
 		std::set<std::string> ret;
 
 		for (std::string line; std::getline(std::cin, line);)
-			ret.insert(trim(line));
+			ret.insert(std::string(trim(line)));
 
 		return ret;
 	}

@@ -14,8 +14,9 @@
 
 namespace {
 	struct Pattern {
-		Pattern(std::string pattern)
+		Pattern(std::string_view p)
 			{
+				std::string pattern{p};
 				m_weight = pattern_weight(pattern);
 				if (!pattern.empty() && pattern.back() == '/' && pattern.find_first_of('*') != std::string::npos)
 					pattern.push_back('*');
@@ -77,7 +78,7 @@ namespace {
 				return std::accumulate(m_patterns.cbegin(), m_patterns.cend(), 0u,
 						       [&path](unsigned m, const Pattern &p) { return std::max(m, p.match(path)); });
 			}
-		void add_maintainer(const std::string &maintainer, std::set<std::string> &suse_users)
+		void add_maintainer(const std::string_view maintainer, std::set<std::string> &suse_users)
 			{
 				Person m{Role::Maintainer};
 				if (parse_person(maintainer, m.name, m.email)) {
@@ -86,7 +87,7 @@ namespace {
 				} else
 					emit_message("MAINTAINERS: contact ", maintainer, " cannot be parsed into name and email!");
 			}
-		void add_pattern(const std::string &pattern) { m_patterns.push_back(Pattern(pattern)); }
+		void add_pattern(const std::string_view pattern) { m_patterns.push_back(Pattern(pattern)); }
 		bool empty() const
 			{
 				return name.empty() || m_maintainers.empty() || m_patterns.empty();
@@ -118,18 +119,18 @@ namespace {
 
 		Stanza st;
 		for (std::string line; getline(file, line);) {
-			std::string tmp = trim(line);
+			std::string_view tmp = trim(line);
 			if (tmp.size() < 2)
 				continue;
 			if (tmp[1] == ':') {
 				if (tmp[0] == 'M')
 					st.add_maintainer(tmp, suse_users);
 				else if (tmp[0] == 'F') {
-					std::string fpattern = trim(tmp.substr(2));
+					std::string_view fpattern = trim(tmp.substr(2));
 					if (fpattern.empty())
 						emit_message("MAINTAINERS entry: ", tmp);
 					else
-						st.add_pattern(std::move(fpattern));
+						st.add_pattern(fpattern);
 				}
 			} else {
 				if (!st.empty())

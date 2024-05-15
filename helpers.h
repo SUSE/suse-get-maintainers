@@ -9,6 +9,7 @@
 #include <cstddef>
 #include <set>
 #include <regex>
+#include <string_view>
 
 #define SGM_BEGIN try {
 #define SGM_END } catch (int ret) { return ret; } catch (...) { return 42; }
@@ -25,12 +26,12 @@ namespace {
 		(std::cerr << ... << args) << std::endl;
 	}
 
-	bool is_hex(const std::string &s)
+	bool is_hex(const std::string_view s)
 	{
 		return std::all_of(s.cbegin(), s.cend(), ::isxdigit);
 	}
 
-	std::string trim(const std::string &line)
+	std::string_view trim(const std::string_view line)
 	{
 		static constexpr const char *spaces = " \n\t\r";
 		const auto pos1 = line.find_first_not_of(spaces);
@@ -39,7 +40,7 @@ namespace {
 		if (pos1 == std::string::npos)
 			return std::string("");
 
-		return line.substr(pos1, pos2-pos1+1);
+		return std::string_view(line).substr(pos1, pos2-pos1+1);
 	}
 
 	const std::string sign_offs[] = {
@@ -79,9 +80,9 @@ namespace {
 			&& users.contains(email.substr(0, email.find_first_of("@")));
 	}
 
-	bool parse_person(const std::string &src, std::string &out_name, std::string &out_email)
+	bool parse_person(const std::string_view src, std::string &out_name, std::string &out_email)
 	{
-		std::string name, email;
+		std::string_view name, email;
 		auto pos = src.find_last_of("@");
 		if (pos == std::string::npos)
 			return false;

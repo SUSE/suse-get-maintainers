@@ -67,7 +67,7 @@ namespace {
 
 		const auto regex_cve_number = std::regex("CVE-[0-9][0-9][0-9][0-9]-[0-9]+", std::regex::optimize);
 		for (const auto &[file, sha]: fc.m_contents) {
-			const std::string sha_hash = trim(sha);
+			const std::string_view sha_hash = trim(sha);
 			if (!is_hex(sha_hash) || sha_hash.size() != 40) {
 				emit_message(sha_hash, " doesn't seem to be a commit hash!");
 				continue;
