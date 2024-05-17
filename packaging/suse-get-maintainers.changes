@@ -1,4 +1,13 @@
 -------------------------------------------------------------------
+Fri May 17 06:52:55 PM CEST 2024 - Miroslav Franc <mfranc@suse.cz>
+
+- Update version 1.0.2
+  * search in the upstream MAINTAINERS file as well
+  * rewrite parsing of MAINTAINERS file
+  * make curl wrapper exception safe
+  * update man page
+
+-------------------------------------------------------------------
 Tue Apr 30 12:34:02 AM CEST 2024 - Miroslav Franc <mfranc@suse.cz>
 
 - Update version 1.0.1
