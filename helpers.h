@@ -216,11 +216,15 @@ namespace {
 	// TODO
 	std::string translate_email(std::string_view sv)
 	{
-		if (do_not_translate)
+		if (do_not_translate || sv.starts_with("kernel-cvs@") || sv.starts_with("kernel@"))
 			return std::string(sv);
 		const std::string key = std::string(sv.substr(0, sv.find("@")));
-		if (translation_table.find(key) != translation_table.cend())
-			return translation_table.at(key) + "@suse.com";
+		const auto it = translation_table.find(key);
+		if (it != translation_table.cend()) {
+			if (it->second.find("@") == std::string::npos)
+				return it->second + "@suse.com";
+			return it->second;
+		}
 		return key + "@suse.com";
 	}
 	// END TODO

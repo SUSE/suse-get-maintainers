@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Tue May 21 01:18:19 AM CEST 2024 - Miroslav Franc <mfranc@suse.cz>
+
+- Update version 1.0.4
+  * fix a bug in temporary bugzilla translation
+
+-------------------------------------------------------------------
 Mon May 20 01:25:42 PM CEST 2024 - Miroslav Franc <mfranc@suse.cz>
 
 - Update version 1.0.3
