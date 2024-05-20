@@ -1,4 +1,11 @@
 -------------------------------------------------------------------
+Mon May 20 01:25:42 PM CEST 2024 - Miroslav Franc <mfranc@suse.cz>
+
+- Update version 1.0.3
+  * implement bugzilla translation (temporary solution)
+  * implement --no_translation (-N) to supress the above
+
+-------------------------------------------------------------------
 Fri May 17 06:52:55 PM CEST 2024 - Miroslav Franc <mfranc@suse.cz>
 
 - Update version 1.0.2

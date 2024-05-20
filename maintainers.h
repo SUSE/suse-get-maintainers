@@ -83,6 +83,9 @@ namespace {
 				Person m{Role::Maintainer};
 				if (parse_person(maintainer, m.name, m.email)) {
 					suse_users.insert(m.email.substr(0, m.email.find_first_of("@")));
+					// TODO
+					m.email = translate_email(m.email);
+					// END TODO
 					m_maintainers.push_back(std::move(m));
 				} else
 					emit_message("MAINTAINERS: contact ", maintainer, " cannot be parsed into name and email!");
@@ -91,6 +94,9 @@ namespace {
 			{
 				Person m{Role::Upstream};
 				if (parse_person(maintainer, m.name, m.email)) {
+					// TODO
+					m.email = translate_email(m.email);
+					// END TODO
 					if (suse_users.contains(m.email.substr(0, m.email.find("@"))))
 						m_maintainers.push_back(std::move(m));
 				} else

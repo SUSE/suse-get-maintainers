@@ -5,6 +5,9 @@ DIRECTORY="$NAME-$VERSION"
 
 mkdir "$DIRECTORY"
 cp "../$NAME.cc" ../maintainers.h ../git2.h ../helpers.h ../curl.h ../cves.h  ../Makefile ../suse-get-maintainers.1 "$DIRECTORY"
+# TODO
+cp ../temporary.h "$DIRECTORY"
+# END TODO
 gzip "$DIRECTORY/suse-get-maintainers.1"
 tar cvJf "$DIRECTORY.tar.xz" "$DIRECTORY" && rm -rf "$DIRECTORY"
 

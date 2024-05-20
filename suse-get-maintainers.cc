@@ -10,6 +10,9 @@
 #include "cves.h"
 #include "curl.h"
 #include "maintainers.h"
+// TODO
+#include "temporary.h"
+// END TODO
 
 namespace {
 	void parse_options(int argc, char **argv);
@@ -26,7 +29,7 @@ namespace {
 			     const std::string &);
 
 	struct gm {
-		gm() : year(0), rejected(false), all_cves(false), json(false), names(false), from_stdin(false), trace(false), refresh(false), init(false) {}
+		gm() : year(0), rejected(false), all_cves(false), json(false), names(false), from_stdin(false), trace(false), refresh(false), init(false), no_translation(false) {}
 
 		std::string maintainers;
 		std::string kernel_tree;
@@ -44,6 +47,7 @@ namespace {
 		bool trace;
 		bool refresh;
 		bool init;
+		bool no_translation;
 	} gm;
 }
 
@@ -66,6 +70,11 @@ int main(int argc, char **argv)
 
 	constexpr const char maintainers_url[] = "https://kerncvs.suse.de/MAINTAINERS";
 	gm.maintainers = fetch_file_if_needed(gm.maintainers, "MAINTAINERS", maintainers_url, gm.trace, gm.refresh);
+
+	// TODO
+	temporary = fetch_file_if_needed(std::string(), "user-bugzilla-map.txt", "https://kerncvs.suse.de/user-bugzilla-map.txt", gm.trace, gm.refresh);
+	load_temporary(translation_table, temporary);
+	// END TODO
 
 	if (gm.init) {
 		if (!gm.kernel_tree.empty()) {
@@ -305,6 +314,7 @@ namespace {
 		os << "  --init, -i                    - Clone upstream repositories;  You need to provide at least -k or -v or both!" << std::endl;
 		os << "  --json, -j                    - Output JSON instead of CSV in batch mode; nop otherwise" << std::endl;
 		os << "  --names, -n                   - Include full names with the emails; by default, just emails are extracted" << std::endl;
+		os << "  --no_translation, -N          - Do not translate to bugzilla emails" << std::endl;
 		os << "  --trace, -t                   - Be a bit more verbose about how we got there on STDERR" << std::endl;
 		os << "  --version, -V                 - Print just the version number" << std::endl;
 	}
@@ -326,6 +336,7 @@ namespace {
 		{ "json", no_argument, nullptr, 'j' },
 		{ "names", no_argument, nullptr, 'n' },
 		{ "trace", no_argument, nullptr, 't' },
+		{ "no_translation", no_argument, nullptr, 'N' },
 		{ "version", no_argument, nullptr, 'V' },
 		{ nullptr, 0, nullptr, 0 },
 	};
@@ -338,7 +349,7 @@ namespace {
 		for (;;) {
 			int opt_idx;
 
-			c = getopt_long(argc, argv, "hm:k:s:p:d:v:c:CRy:rijntV", opts, &opt_idx);
+			c = getopt_long(argc, argv, "hm:k:s:p:d:v:c:CRy:rijntNV", opts, &opt_idx);
 			if (c == -1)
 				break;
 
@@ -405,6 +416,12 @@ namespace {
 				break;
 			case 't':
 				gm.trace = true;
+				break;
+			case 'N':
+				gm.no_translation = true;
+				// TODO
+				do_not_translate = true;
+				// END TODO
 				break;
 			case 'V':
 				std::cout << SUSE_GET_MAINTAINERS_VERSION << std::endl;

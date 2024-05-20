@@ -11,6 +11,13 @@
 #include <regex>
 #include <string_view>
 
+// TODO
+#include <unordered_map>
+std::unordered_map<std::string, std::string> translation_table;
+std::string temporary;
+bool do_not_translate = false;
+// END TODO
+
 #define SGM_BEGIN try {
 #define SGM_END } catch (int ret) { return ret; } catch (...) { return 42; }
 
@@ -205,6 +212,18 @@ namespace {
 				var = ptr;
 		}
 	}
+
+	// TODO
+	std::string translate_email(std::string_view sv)
+	{
+		if (do_not_translate)
+			return std::string(sv);
+		const std::string key = std::string(sv.substr(0, sv.find("@")));
+		if (translation_table.find(key) != translation_table.cend())
+			return translation_table.at(key) + "@suse.com";
+		return key + "@suse.com";
+	}
+	// END TODO
 }
 
 #endif
