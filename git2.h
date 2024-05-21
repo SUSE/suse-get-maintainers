@@ -423,6 +423,23 @@ namespace {
 			pp(s, sb, paths);
 		}
 	}
+
+	void fetch_repo(const std::string &repo_path, const std::string &name)
+	{
+		emit_message("Trying to fetch... ", name, " in ", repo_path);
+		Repo repo;
+		if (repo.from_path(repo_path))
+			fail_with_message(git_error_last()->message);
+
+		Remote remote;
+		if (remote.from_name(repo, name))
+			fail_with_message(git_error_last()->message);
+
+		if (remote.fetch())
+			fail_with_message(git_error_last()->message);
+
+		remote.print_stats();
+	}
 }
 
 #endif
