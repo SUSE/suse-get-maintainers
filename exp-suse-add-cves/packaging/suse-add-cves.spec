@@ -1,7 +1,7 @@
 Name:           suse-add-cves
-Version:        0.9
+Version:        0.9.1
 Release:        0
-Summary:        A tool to update CVE in a patch
+Summary:        A tool to update CVE reference in patches
 License:        GPL-3.0-or-later
 Group:          Development/Libraries/C and C++
 URL:            https://gitlab.suse.de/mfranc/tracking-fixes
