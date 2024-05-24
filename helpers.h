@@ -135,7 +135,7 @@ namespace {
 		Role role;
 		bool parse(const std::string &s)
 			{
-				for (std::size_t i = 1; i < index(Role::Maintainer); ++i) {
+				for (std::size_t i = 1; i < index(Role::TestedBy); ++i) {
 					Role r = static_cast<Role>(i);
 					if (s.starts_with(to_string(r))) {
 						role = r;

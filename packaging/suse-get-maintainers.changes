@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Fri May 24 10:50:16 AM CEST 2024 - Miroslav Franc <mfranc@suse.cz>
+
+- Update version 1.0.5
+  * do not report Tested-by and Reported-by as experts
+
+-------------------------------------------------------------------
 Tue May 21 01:18:19 AM CEST 2024 - Miroslav Franc <mfranc@suse.cz>
 
 - Update version 1.0.4
