@@ -236,7 +236,7 @@ namespace {
 					return GIT_ENOTFOUND;
 				return git_blob_lookup(&m_blob, git_tree_owner(tree.get()), git_tree_entry_id(te.te));
 			}
-		git_blob *get() const { return m_blob; }
+		std::string get_file() const { return std::string(static_cast<const char *>(git_blob_rawcontent(m_blob))); }
 	private:
 		git_blob *m_blob;
 	};
@@ -253,18 +253,9 @@ namespace {
 						errors = true;
 						continue;
 					}
-					m_contents.insert(std::make_pair(p.first, std::string(static_cast<const char *>(git_blob_rawcontent(b.get())))));
+					m_contents.insert(std::make_pair(p.first, b.get_file()));
 				}
 				return m_contents.empty() && errors ? 1 : 0;
-			}
-		int from_tree_and_path(Tree &tree, const std::string &s)
-			{
-				int err;
-				Blob b;
-				if((err = b.from_tree_and_path(tree, s.c_str())))
-					return err;
-				m_contents.insert(std::make_pair(s, std::string(static_cast<const char *>(git_blob_rawcontent(b.get())))));
-				return 0;
 			}
 		std::unordered_map<std::string, std::string> m_contents;
 	};

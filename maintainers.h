@@ -182,11 +182,11 @@ namespace {
 		if (commit_tree.from_commit(commit))
 			fail_with_message(error_message, git_error_last()->message);
 
-		FilesContents fc;
-		if (fc.from_tree_and_path(commit_tree, "MAINTAINERS"))
+		Blob b;
+		if (b.from_tree_and_path(commit_tree, "MAINTAINERS"))
 			fail_with_message(error_message, git_error_last()->message);
 
-		std::istringstream upstream_maintainters_file(fc.m_contents["MAINTAINERS"]);
+		std::istringstream upstream_maintainters_file(b.get_file());
 		Stanza st;
 		bool skip = true;
 		for (std::string line; getline(upstream_maintainters_file, line); ) {
