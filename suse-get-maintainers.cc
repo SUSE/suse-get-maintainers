@@ -29,8 +29,6 @@ namespace {
 			     const std::string &);
 
 	struct gm {
-		gm() : year(0), rejected(false), all_cves(false), json(false), names(false), from_stdin(false), trace(false), refresh(false), init(false), no_translation(false) {}
-
 		std::string maintainers;
 		std::string kernel_tree;
 		std::set<std::string> shas;
@@ -38,16 +36,17 @@ namespace {
 		std::set<std::string> diffs;
 		std::string vulns;
 		std::set<std::string> cves;
-		int year;
-		bool rejected;
-		bool all_cves;
-		bool json;
-		bool names;
-		bool from_stdin;
-		bool trace;
-		bool refresh;
-		bool init;
-		bool no_translation;
+		int year = 0;
+		bool rejected = false;
+		bool all_cves = false;
+		bool json = false;
+		bool names = false;
+		bool from_stdin = false;
+		bool trace = false;
+		bool refresh = false;
+		bool init = false;
+		bool no_translation = false;
+		bool only_maintainers = false;
 	} gm;
 }
 
@@ -142,7 +141,7 @@ int main(int argc, char **argv)
 			bool first = true;
 			for (const auto &ps: gm.diffs) {
 				try {
-					std::variant<std::set<std::string>, Person> s = get_paths_from_patch(ps, suse_users);
+					std::variant<std::set<std::string>, Person> s = get_paths_from_patch(ps, suse_users, gm.only_maintainers);
 					if (gm.trace && std::holds_alternative<std::set<std::string>>(s)) {
 
 						std::cerr << "patch " << ps << " contains the following paths: " << std::endl;
@@ -170,7 +169,7 @@ int main(int argc, char **argv)
 			if (gm.json)
 				std::cout << "\n]" << std::endl;
 		} else {
-			std::variant<std::set<std::string>, Person> s = get_paths_from_patch(*gm.diffs.cbegin(), suse_users);
+			std::variant<std::set<std::string>, Person> s = get_paths_from_patch(*gm.diffs.cbegin(), suse_users, gm.only_maintainers);
 			if (gm.trace && std::holds_alternative<std::set<std::string>>(s)) {
 				std::cerr << "patch " << *gm.diffs.cbegin() << " contains the following paths: " << std::endl;
 				for (const auto &p: std::get<std::set<std::string>>(s))
@@ -253,7 +252,7 @@ int main(int argc, char **argv)
 		if (gm.json)
 			std::cout << "[\n";
 
-		search_commit(rk, gm.shas, suse_users,
+		search_commit(rk, gm.shas, suse_users, gm.only_maintainers,
 			      [&maintainers, &upstream_maintainers, &has_cves, &first, &cve_hash_map, simple]
 			      (const std::string &sha, const Person &sb, const std::set<std::string> &paths) {
 			if (gm.trace && !paths.empty()) {
@@ -315,6 +314,7 @@ namespace {
 		os << "  --json, -j                    - Output JSON instead of CSV in batch mode; nop otherwise" << std::endl;
 		os << "  --names, -n                   - Include full names with the emails; by default, just emails are extracted" << std::endl;
 		os << "  --no_translation, -N          - Do not translate to bugzilla emails" << std::endl;
+		os << "  --only_maintainers, -M        - Do not analyze the patches/commits; only MAINTAINERS files" << std::endl;
 		os << "  --trace, -t                   - Be a bit more verbose about how we got there on STDERR" << std::endl;
 		os << "  --version, -V                 - Print just the version number" << std::endl;
 	}
@@ -337,6 +337,7 @@ namespace {
 		{ "names", no_argument, nullptr, 'n' },
 		{ "trace", no_argument, nullptr, 't' },
 		{ "no_translation", no_argument, nullptr, 'N' },
+		{ "only_maintainers", no_argument, nullptr, 'M' },
 		{ "version", no_argument, nullptr, 'V' },
 		{ nullptr, 0, nullptr, 0 },
 	};
@@ -349,7 +350,7 @@ namespace {
 		for (;;) {
 			int opt_idx;
 
-			c = getopt_long(argc, argv, "hm:k:s:p:d:v:c:CRy:rijntNV", opts, &opt_idx);
+			c = getopt_long(argc, argv, "hm:k:s:p:d:v:c:CRy:rijntNMV", opts, &opt_idx);
 			if (c == -1)
 				break;
 
@@ -422,6 +423,9 @@ namespace {
 				// TODO
 				do_not_translate = true;
 				// END TODO
+				break;
+			case 'M':
+				gm.only_maintainers = true;
 				break;
 			case 'V':
 				std::cout << SUSE_GET_MAINTAINERS_VERSION << std::endl;

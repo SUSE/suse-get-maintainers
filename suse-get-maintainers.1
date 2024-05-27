@@ -157,6 +157,10 @@ change in the future.
 Do not translate emails to bugzilla emails, but keep them as they are.
 
 .TP
+.BR \-M ", " \-\-only_maintainers
+Do not search the patches/commits for Authors, Sign-offs and the like.
+
+.TP
 .BR \-t ", " \-\-trace
 This essentially a debugging option where extra steps are printed on
 STDERR.  If you are not sure what the program is doing, this is the
@@ -264,6 +268,18 @@ Clone only vulnerability db into /tmp/vulns.
 
 .RS
 $ suse\-get\-maintainers \-iv /tmp/vulns
+.RE
+
+Report.  Subsystems with more than 10 CVEs in descending order.  \-M is to suppress reporting authors and sign-offs on the commits.
+
+.RS
+suse\-get\-maintainers \-CM |\\
+.RE
+.RS
+awk \-F, \(aq{tally[$3]++} END{for (t in tally) { if (tally[t] < 10) continue; printf("%3d\\t%s\\n", tally[t], t); }}\(aq |\\
+.RE
+.RS
+sort \-t\\t \-k1,1 \-nr | nl
 .RE
 
 .SH TODO

@@ -367,6 +367,7 @@ namespace {
 	void search_commit(Repo &repo,
 			   const std::set<std::string> &shas,
 			   const std::set<std::string> &suse_users,
+			   bool skip_signoffs,
 			   std::function<void(const std::string &, const Person &, const std::set<std::string> &)> pp)
 	{
 		for (const std::string &s: shas) {
@@ -385,10 +386,13 @@ namespace {
 				continue;
 
 			std::set<std::string> paths;
-			Person sb = commit.get_somebody_else(suse_users);
-			if (sb.role != Role::Maintainer) {
-				pp(s, sb, paths);
-				continue;
+			Person sb;
+			if (!skip_signoffs) {
+				sb = commit.get_somebody_else(suse_users);
+				if (sb.role != Role::Maintainer) {
+					pp(s, sb, paths);
+					continue;
+				}
 			}
 
 			Commit parent;

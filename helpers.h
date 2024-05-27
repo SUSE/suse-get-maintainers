@@ -155,7 +155,7 @@ namespace {
 				emit_message(str, " does not seem to be a valid CVE number");
 	}
 
-	std::variant<std::set<std::string>, Person> get_paths_from_patch(const std::string &path, const std::set<std::string>& users)
+	std::variant<std::set<std::string>, Person> get_paths_from_patch(const std::string &path, const std::set<std::string>& users, bool skip_signoffs)
 	{
 		std::variant<std::set<std::string>, Person> ret;
 		std::string path_to_patch;
@@ -178,7 +178,7 @@ namespace {
 		bool signoffs = true;
 		std::smatch match;
 		for (std::string line; std::getline(file, line); ) {
-			if (signoffs) {
+			if (!skip_signoffs && signoffs) {
 				if (line.starts_with("From")) {
 					Person a{Role::Author};
 					if (parse_person(line, a.name, a.email) && is_suse_address(users, a.email)) {
