@@ -29,8 +29,6 @@ the following:
             Suggested\-by
             Reviewed\-by
             Acked\-by
-            Tested\-by
-            Reported\-by
 .RE
 
 And the address seems to be a kernel maintainer from SUSE.
@@ -273,7 +271,7 @@ $ suse\-get\-maintainers \-iv /tmp/vulns
 Report.  Subsystems with more than 10 CVEs in descending order.  \-M is to suppress reporting authors and sign-offs on the commits.
 
 .RS
-suse\-get\-maintainers \-CM |\\
+$ suse\-get\-maintainers \-CM |\\
 .RE
 .RS
 awk \-F, \(aq{tally[$3]++} END{for (t in tally) { if (tally[t] < 10) continue; printf("%3d\\t%s\\n", tally[t], t); }}\(aq |\\
@@ -281,6 +279,19 @@ awk \-F, \(aq{tally[$3]++} END{for (t in tally) { if (tally[t] < 10) continue; p
 .RS
 sort \-t\\t \-k1,1 \-nr | nl
 .RE
+
+Since version 1.0.3, the emails are automatically translated to bugzilla compatible emails. If you don't want this or it misbehaves, you can turn off by \-N or \-\-no_translation option.
+
+.RS
+$ suse\-get\-maintainers \-CN | grep mfranc
+.RE
+
+as opposed to
+
+.RS
+$ suse\-get\-maintainers \-C | grep miroslav.franc
+.RE
+
 
 .SH TODO
 Fetch supported branches automatically and search SUSE patches in them
