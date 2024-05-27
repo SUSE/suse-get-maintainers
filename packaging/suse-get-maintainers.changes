@@ -3,6 +3,7 @@ Mon May 27 09:38:06 AM CEST 2024 - Miroslav Franc <mfranc@suse.cz>
 
 - Update version 1.0.6
   * add --only_maintainers (-M) option
+  * fix/add "signoff" email translation
   * update manpage
 
 -------------------------------------------------------------------
