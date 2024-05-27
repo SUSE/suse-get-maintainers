@@ -364,11 +364,12 @@ namespace {
 		}
 	}
 
+	template<typename F>
 	void search_commit(Repo &repo,
 			   const std::set<std::string> &shas,
 			   const std::set<std::string> &suse_users,
 			   bool skip_signoffs,
-			   std::function<void(const std::string &, const Person &, const std::set<std::string> &)> pp)
+			   F pp)
 	{
 		for (const std::string &s: shas) {
 			Object obj;

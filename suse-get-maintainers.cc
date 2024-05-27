@@ -22,10 +22,11 @@ namespace {
 	void json_output(const Stanza &m, const std::string&);
 	void show_person(const Person &, const std::string &, bool);
 	std::set<std::string> read_stdin_sans_new_lines();
+	template<typename F>
 	void for_all_stanzas(const std::vector<Stanza> &,
 			     const std::vector<Stanza> &,
 			     const std::set<std::string> &,
-			     std::function<void(const Stanza &, const std::string &)>,
+			     F pp,
 			     const std::string &);
 
 	struct gm {
@@ -531,10 +532,11 @@ namespace {
 		return ret;
 	}
 
+	template<typename F>
 	void for_all_stanzas(const std::vector<Stanza> &suse_stanzas,
 			     const std::vector<Stanza> &upstream_stanzas,
 			     const std::set<std::string> &paths,
-			     std::function<void(const Stanza &, const std::string &)> pretty_printer,
+			     F pp,
 			     const std::string &what)
 	{
 		std::optional<const Stanza *> stanza = find_best_match(suse_stanzas, paths);
@@ -542,7 +544,7 @@ namespace {
 		if (stanza.has_value()) {
 			if (gm.trace)
 				std::cerr << "STANZA: " << stanza.value()->name << std::endl;
-			pretty_printer(*stanza.value(), what);
+			pp(*stanza.value(), what);
 			return;
 		}
 
@@ -551,13 +553,13 @@ namespace {
 		if (stanza.has_value()) {
 			if (gm.trace)
 				std::cerr << "Upstream STANZA: " << stanza.value()->name << std::endl;
-			pretty_printer(*stanza.value(), what);
+			pp(*stanza.value(), what);
 			return;
 		}
 
 		thread_local auto catch_all_maintainer = Stanza{"Base", "F: Kernel Developers at SuSE <kernel@suse.de>"};
 		if (gm.trace)
 			std::cerr << "STANZA: " << catch_all_maintainer.name << std::endl;
-		pretty_printer(catch_all_maintainer, what);
+		pp(catch_all_maintainer, what);
 	}
 }

@@ -107,7 +107,8 @@ namespace {
 			{
 				return name.empty() || m_maintainers.empty() || m_patterns.empty();
 			}
-		void for_all_maintainers(std::function<void(const Person &)> callback) const
+		template<typename F>
+		void for_all_maintainers(F callback) const
 			{
 				for (const auto &p: m_maintainers)
 					callback(p);
