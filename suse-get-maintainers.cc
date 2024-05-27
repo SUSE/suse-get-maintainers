@@ -478,10 +478,11 @@ namespace {
 
 	void show_person(const Person &sb, const std::string &what, bool simple)
 	{
+		std::string tmp_email = translate_email(sb.email); // TODO
 		if (simple) {
 			if (gm.names)
 				std::cout << sb.name << " <";
-			std::cout << sb.email;
+			std::cout << tmp_email; // TODO
 			if (gm.names)
 				std::cout << ">";
 			std::cout << std::endl;
@@ -489,7 +490,7 @@ namespace {
 			std::cout << what << ',' << "\n\t\t\"role\": \"" << to_string(sb.role) << "\",\n\t\t" << "\"email\": \"";
 			if (gm.names)
 				std::cout << sb.name << " <";
-			std::cout << sb.email;
+			std::cout << tmp_email; // TODO
 			if (gm.names)
 				std::cout << ">\"";
 			std::cout << "\n\t}";
@@ -497,7 +498,7 @@ namespace {
 			std::cout << what << ',' << '"' << to_string(sb.role) << '"' << ',';
 			if (gm.names)
 				std::cout << sb.name << " <";
-			std::cout << sb.email;
+			std::cout << tmp_email; // TODO
 			if (gm.names)
 				std::cout << ">";
 			std::cout << std::endl;
