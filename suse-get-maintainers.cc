@@ -55,7 +55,6 @@ int main(int argc, char **argv)
 {
 	SGM_BEGIN;
 
-	LibGit2 libgit2_state;
 	std::vector<Stanza> maintainers;
 	std::vector<Stanza> upstream_maintainers;
 	std::set<std::string> suse_users;
@@ -75,6 +74,8 @@ int main(int argc, char **argv)
 	temporary = fetch_file_if_needed(std::string(), "user-bugzilla-map.txt", "https://kerncvs.suse.de/user-bugzilla-map.txt", gm.trace, gm.refresh);
 	load_temporary(translation_table, temporary);
 	// END TODO
+
+	LibGit2 libgit2_state;
 
 	if (gm.init) {
 		if (!gm.kernel_tree.empty()) {
