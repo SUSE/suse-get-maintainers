@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <ctime>
+#include <filesystem>
 
 #include <getopt.h>
 #include <sys/stat.h>
@@ -21,10 +22,9 @@ namespace {
 	bool already_has_reference(const std::string&, const std::string&);
 	void parse_options(int argc, char **argv);
 	struct gm {
-		gm() : init(false) {}
 		std::string vulns;
 		std::vector<std::string> paths;
-		bool init;
+		bool init = false;
 	} gm;
 
 }
@@ -148,16 +148,19 @@ namespace {
 		os << "  --vulns, -v <path>         - Path to the clone of https://git.kernel.org/pub/scm/linux/security/vulns.git ($VULNS_GIT)" << std::endl;
 		os << "  --init, -i                 - Clone the upstream vulns repository;  You need to provide at least -v!" << std::endl;
 		os << "  --from_stdin, -f           - Read paths to patches from stdin instead of arguments" << std::endl;
+		os << "  --ksource_git, -k          - Just process all files in $KSOURCE_GIT/patches.suse" << std::endl;
 	}
 
 	struct option opts[] = {
 		{ "help", no_argument, nullptr, 'h' },
 		{ "vulns", required_argument, nullptr, 'v' },
 		{ "from_stdin", no_argument, nullptr, 'f' },
+		{ "ksource_git", no_argument, nullptr, 'k' },
 		{ "init", no_argument, nullptr, 'i' },
 		{ nullptr, 0, nullptr, 0 },
 	};
 
+	std::vector<std::string> read_all_patches();
 	void parse_options(int argc, char **argv)
 	{
 		int c;
@@ -165,7 +168,7 @@ namespace {
 		for (;;) {
 			int opt_idx;
 
-			c = getopt_long(argc, argv, "hv:if", opts, &opt_idx);
+			c = getopt_long(argc, argv, "hv:ifk", opts, &opt_idx);
 			if (c == -1)
 				break;
 
@@ -181,6 +184,9 @@ namespace {
 				break;
 			case 'f':
 				gm.paths = read_patch_sans_new_lines(std::cin, true);
+				break;
+			case 'k':
+				gm.paths = read_all_patches();
 				break;
 			default:
 				usage(argv[0], std::cerr);
@@ -245,6 +251,28 @@ namespace {
 				ret.push_back(strip(line));
 			else
 				ret.push_back(line);
+
+		return ret;
+	}
+
+	std::vector<std::string> read_all_patches()
+	{
+		std::string ksource_git;
+		try_to_fetch_env(ksource_git, "KSOURCE_GIT");
+		if (ksource_git.empty())
+			fail_with_message("Please set KSOURCE_GIT!");
+		ksource_git += "/patches.suse";
+		if (!std::filesystem::exists(ksource_git))
+			fail_with_message(ksource_git + " does not exists!");
+
+		std::vector<std::string> ret;
+
+		try {
+			for (const auto &entry: std::filesystem::directory_iterator(ksource_git))
+				ret.push_back(entry.path());
+		} catch (...) {
+			fail_with_message(ksource_git + " cannot be read!");
+		}
 
 		return ret;
 	}
