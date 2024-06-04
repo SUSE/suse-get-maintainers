@@ -13,13 +13,16 @@
 #include "helpers.h"
 #include "git2.h"
 #include "cves.h"
+#include "curl.h"
+#include "cve2bugzilla.h"
 
 namespace {
 	void usage(const char *prog, std::ostream &os);
 	std::vector<std::string> read_patch_sans_new_lines(std::istream &, bool);
 	std::string get_hash(const std::vector<std::string> &, long&);
 	long get_references_idx(const std::vector<std::string> &);
-	bool already_has_reference(const std::string&, const std::string&);
+	bool already_has_cve_ref(const std::string&, const std::string&);
+	bool already_has_bsc_ref(const std::string&, const std::string&);
 	void parse_options(int argc, char **argv);
 	struct gm {
 		std::string vulns;
@@ -39,6 +42,8 @@ int main(int argc, char **argv)
 		fail_with_message("You must provide at least one patch or clone the vulns repository with --init (-i) and --vulns (-v)!  See --help (-h)!");
 
 	LibGit2 lg2_state;
+	constexpr const char cve2bugzilla_url[] = "https://gitlab.suse.de/security/cve-database/-/raw/master/data/cve2bugzilla";
+	std::string cve2bugzilla_file = fetch_file_if_needed(std::string(), "cve2bugzilla.txt", cve2bugzilla_url, false, false);
 
 	if (gm.init) {
 		if (!gm.vulns.empty()) {
@@ -69,8 +74,10 @@ int main(int argc, char **argv)
 
 			constexpr decltype(current_time.tv_sec) expires_after_seconds = 60 * 15;
 			decltype(current_time.tv_sec) time_diff = current_time.tv_sec - sb.st_mtim.tv_sec;
-			if (time_diff > expires_after_seconds)
+			if (time_diff > expires_after_seconds) {
 				fetch_repo(gm.vulns, "origin");
+				cve2bugzilla_file = fetch_file_if_needed(std::string(), "cve2bugzilla.txt", cve2bugzilla_url, false, true);
+			}
 			struct utimbuf t;
 			t.modtime = current_time.tv_sec;
 			utime(origin_master_ref.c_str(), &t);
@@ -80,6 +87,10 @@ int main(int argc, char **argv)
 	CVEHashMap cve_hash_map{0, false};
 	if (!cve_hash_map.load(gm.vulns))
 		fail_with_message("Couldn't load kernel vulns database git tree");
+
+	CVE2Bugzilla cve_to_bugzilla;
+	if (!cve_to_bugzilla.load(cve2bugzilla_file))
+		fail_with_message("Couldn't load cve2bugzilla.txt");
 
 	for (auto const &p: gm.paths) {
 		std::string path_to_patch;
@@ -107,17 +118,18 @@ int main(int argc, char **argv)
 		const std::string cve = cve_hash_map.get_cve(sha);
 		if (cve.empty())
 			continue;
+		const std::string bsc = cve_to_bugzilla.get_bsc(cve);
 
 		const long idx = get_references_idx(lines);
 		if (idx == -1) {
-			const std::string update = lines[sha_idx] + "\nReferences: " + cve;
-			lines[sha_idx] = update;
+			lines[sha_idx] += "\nReferences: " + cve;
+			if (!bsc.empty())
+				lines[sha_idx] += " " + bsc;
 		} else {
-			if (already_has_reference(lines[idx], cve))
-				continue;
-
-			const std::string update = lines[idx] + " " + cve;
-			lines[idx] = update;
+			if (!already_has_cve_ref(lines[idx], cve))
+				lines[idx] += " " + cve;
+			if (!bsc.empty() && !already_has_bsc_ref(lines[idx], bsc))
+				lines[idx] += " " + bsc;
 		}
 
 		std::string new_patch = path_to_patch;
@@ -236,10 +248,15 @@ namespace {
 		return -1;
 	}
 
-	bool already_has_reference(const std::string &ref_line, const std::string &cve_number)
+	bool already_has_cve_ref(const std::string &ref_line, const std::string &cve_number)
 	{
 		const auto git_cve_regex = std::regex(cve_number, std::regex::optimize | std::regex::icase);
 		return std::regex_search(ref_line, git_cve_regex);
+	}
+
+	bool already_has_bsc_ref(const std::string &ref_line, const std::string &bsc_number)
+	{
+		return ref_line.find(bsc_number) != std::string::npos;
 	}
 
 	std::vector<std::string> read_patch_sans_new_lines(std::istream &f, bool trim)

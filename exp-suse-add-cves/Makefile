@@ -19,7 +19,7 @@ debug: all
 	${CXX} -MM -c $(CXXFLAGS) $< > $@
 
 $(TARGET): $(TARGET).o
-	${CXX} -o $@ $(CXXFLAGS) $+ -lgit2
+	${CXX} -o $@ $(CXXFLAGS) $+ -lgit2 -lcurl
 
 clean:
 	rm -f $(TARGET) *.o
