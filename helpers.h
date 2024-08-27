@@ -155,9 +155,9 @@ namespace {
 				emit_message(str, " does not seem to be a valid CVE number");
 	}
 
-	std::variant<std::set<std::string>, Person> get_paths_from_patch(const std::string &path, const std::set<std::string>& users, bool skip_signoffs)
+	std::variant<std::set<std::string>, std::vector<Person>> get_paths_from_patch(const std::string &path, const std::set<std::string>& users, bool skip_signoffs)
 	{
-		std::variant<std::set<std::string>, Person> ret;
+		std::variant<std::set<std::string>, std::vector<Person>> ret;
 		std::string path_to_patch;
 
 		if (!path.empty() && path[0] != '/') {
@@ -175,22 +175,19 @@ namespace {
 		thread_local const auto regex_rem = std::regex("^--- [ab]/(.+)", std::regex::optimize);
 
 		std::set<std::string> paths;
+		std::vector<Person> people;
 		bool signoffs = true;
 		std::smatch match;
 		for (std::string line; std::getline(file, line); ) {
 			if (!skip_signoffs && signoffs) {
 				if (line.starts_with("From")) {
 					Person a{Role::Author};
-					if (parse_person(line, a.name, a.email) && is_suse_address(users, a.email)) {
-						ret = std::move(a);
-						return ret;
-					}
+					if (parse_person(line, a.name, a.email) && is_suse_address(users, a.email))
+						people.push_back(std::move(a));
 				}
 				Person p;
-				if (p.parse(line) && is_suse_address(users, p.email)) {
-					ret = std::move(p);
-					return ret;
-				}
+				if (p.parse(line) && is_suse_address(users, p.email))
+					people.push_back(std::move(p));
 				if (line.starts_with("---"))
 				    signoffs = false;
 			}
@@ -200,7 +197,10 @@ namespace {
 			else if (std::regex_search(line, match, regex_rem))
 				paths.insert(match.str(1));
 		}
-		ret = std::move(paths);
+		if (people.empty())
+			ret = std::move(paths);
+		else
+			ret = std::move(people);
 		return ret;
 	}
 

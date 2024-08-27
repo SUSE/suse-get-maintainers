@@ -131,9 +131,9 @@ namespace {
 
 		int from_oid(Repo &repo, const git_oid *oid) { return git_commit_lookup(&m_commit, repo.get(), oid); }
 		int from_parent(const Commit &c, unsigned int parent_number = 0) { return git_commit_parent(&m_commit, c.get(), parent_number); }
-		Person get_somebody_else(const std::set<std::string> &users) const
+		std::vector<Person> get_somebody_else(const std::set<std::string> &users) const
 			{
-				Person ret;
+				std::vector<Person> ret;
 				if (m_commit) {
 					Person a;
 					const git_signature *author;
@@ -141,18 +141,14 @@ namespace {
 					a.name = author->name;
 					a.email = author->email;
 					a.role = Role::Author;
-					if (is_suse_address(users, a.email)) {
-						ret = std::move(a);
-						return ret;
-					}
+					if (is_suse_address(users, a.email))
+						ret.push_back(std::move(a));
 					const std::string message = git_commit_message(m_commit);
 					std::istringstream stream(message);
 					for (std::string line; std::getline(stream, line);) {
 						Person p;
-						if (p.parse(line) && is_suse_address(users, p.email)) {
-							ret = std::move(p);
-							return ret;
-						}
+						if (p.parse(line) && is_suse_address(users, p.email))
+							ret.push_back(std::move(p));
 					}
 				}
 				return ret;
@@ -387,10 +383,10 @@ namespace {
 				continue;
 
 			std::set<std::string> paths;
-			Person sb;
+			std::vector<Person> sb;
 			if (!skip_signoffs) {
 				sb = commit.get_somebody_else(suse_users);
-				if (sb.role != Role::Maintainer) {
+				if (!sb.empty()) {
 					pp(s, sb, paths);
 					continue;
 				}

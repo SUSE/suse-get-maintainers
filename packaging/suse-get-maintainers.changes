@@ -1,4 +1,11 @@
 -------------------------------------------------------------------
+Wed Aug 28 02:19:42 PM CEST 2024 - Miroslav Franc <mfranc@suse.cz>
+
+- Update version 1.0.7
+  * show all *-by tags from the commit, not just the first one
+  * fix typo in a manpage
+
+-------------------------------------------------------------------
 Mon May 27 09:38:06 AM CEST 2024 - Miroslav Franc <mfranc@suse.cz>
 
 - Update version 1.0.6

@@ -20,7 +20,7 @@ namespace {
 	void show_emails(const Stanza &m, const std::string&);
 	void csv_output(const Stanza &m, const std::string&);
 	void json_output(const Stanza &m, const std::string&);
-	void show_person(const Person &, const std::string &, bool);
+	void show_people(const std::vector<Person> &, const std::string &, bool);
 	std::set<std::string> read_stdin_sans_new_lines();
 	template<typename F>
 	void for_all_stanzas(const std::vector<Stanza> &,
@@ -143,7 +143,7 @@ int main(int argc, char **argv)
 			bool first = true;
 			for (const auto &ps: gm.diffs) {
 				try {
-					std::variant<std::set<std::string>, Person> s = get_paths_from_patch(ps, suse_users, gm.only_maintainers);
+					std::variant<std::set<std::string>, std::vector<Person>> s = get_paths_from_patch(ps, suse_users, gm.only_maintainers);
 					if (gm.trace && std::holds_alternative<std::set<std::string>>(s)) {
 
 						std::cerr << "patch " << ps << " contains the following paths: " << std::endl;
@@ -158,12 +158,9 @@ int main(int argc, char **argv)
 						what += "\t{\n\t\t\"diff\": \"" + ps + "\"";
 					} else
 						what = ps;
-					if (std::holds_alternative<Person>(s)) {
-						const Person sb = std::get<Person>(s);
-						if (gm.trace)
-							emit_message("We have ", sb.role == Role::Author || sb.role == Role::AckedBy
-								     ? "an " : "a ", to_string(sb.role));
-						show_person(sb, what, false);
+					if (std::holds_alternative<std::vector<Person>>(s)) {
+						const std::vector<Person> sb = std::get<std::vector<Person>>(s);
+						show_people(sb, what, false);
 					} else
 						for_all_stanzas(maintainers, upstream_maintainers, std::get<std::set<std::string>>(s), gm.json ? json_output : csv_output, what);
 				} catch (...) { continue; }
@@ -171,18 +168,15 @@ int main(int argc, char **argv)
 			if (gm.json)
 				std::cout << "\n]" << std::endl;
 		} else {
-			std::variant<std::set<std::string>, Person> s = get_paths_from_patch(*gm.diffs.cbegin(), suse_users, gm.only_maintainers);
+			std::variant<std::set<std::string>, std::vector<Person>> s = get_paths_from_patch(*gm.diffs.cbegin(), suse_users, gm.only_maintainers);
 			if (gm.trace && std::holds_alternative<std::set<std::string>>(s)) {
 				std::cerr << "patch " << *gm.diffs.cbegin() << " contains the following paths: " << std::endl;
 				for (const auto &p: std::get<std::set<std::string>>(s))
 					std::cerr << '\t' << p << std::endl;
 			}
-			if (std::holds_alternative<Person>(s)) {
-				const Person sb = std::get<Person>(s);
-				if (gm.trace)
-					emit_message("We have ", sb.role == Role::Author || sb.role == Role::AckedBy
-						     ? "an " : "a ", to_string(sb.role));
-				show_person(sb, "", true);
+			if (std::holds_alternative<std::vector<Person>>(s)) {
+				const std::vector<Person> sb = std::get<std::vector<Person>>(s);
+				show_people(sb, "", true);
 			} else
 				for_all_stanzas(maintainers, upstream_maintainers, std::get<std::set<std::string>>(s), show_emails, "");
 		}
@@ -256,7 +250,7 @@ int main(int argc, char **argv)
 
 		search_commit(rk, gm.shas, suse_users, gm.only_maintainers,
 			      [&maintainers, &upstream_maintainers, &has_cves, &first, &cve_hash_map, simple]
-			      (const std::string &sha, const Person &sb, const std::set<std::string> &paths) {
+			      (const std::string &sha, const std::vector<Person> &sb, const std::set<std::string> &paths) {
 			if (gm.trace && !paths.empty()) {
 				std::cerr << "SHA " << sha << " contains the following paths: " << std::endl;
 				for (const auto &p: paths)
@@ -275,10 +269,8 @@ int main(int argc, char **argv)
 				what = cve_hash_map.get_cve(sha) + "," + sha;
 			else
 				what = sha;
-			if (sb.role != Role::Maintainer) {
-				if (gm.trace)
-					emit_message("We have ", sb.role == Role::Author || sb.role == Role::AckedBy ? "an " : "a ", to_string(sb.role));
-				show_person(sb, what, simple);
+			if (!sb.empty()) {
+				show_people(sb, what, simple);
 			} else
 				for_all_stanzas(maintainers, upstream_maintainers, paths, simple ? show_emails : gm.json ? json_output : csv_output, what);
 		});
@@ -451,7 +443,6 @@ namespace {
 
 	void csv_output(const Stanza &m, const std::string &what)
 	{
-
 		std::cout << what << ',' << '"' << m.name << '"';
 		m.for_all_maintainers([](const Person &p) {
 			if (gm.names && !p.name.empty())
@@ -478,31 +469,68 @@ namespace {
 		std::cout << "]\n\t}";
 	}
 
-	void show_person(const Person &sb, const std::string &what, bool simple)
+	void show_people(const std::vector<Person> &sb, const std::string &what, bool simple)
 	{
-		std::string tmp_email = translate_email(sb.email); // TODO
+
 		if (simple) {
-			if (gm.names)
-				std::cout << sb.name << " <";
-			std::cout << tmp_email; // TODO
-			if (gm.names)
-				std::cout << ">";
-			std::cout << std::endl;
+			std::set<std::string> duplicate_set;
+			for (const Person &p: sb) {
+				std::string tmp_email = translate_email(p.email); // TODO
+				if (duplicate_set.contains(tmp_email))
+					continue;
+				duplicate_set.insert(tmp_email);
+				if (gm.names)
+					std::cout << p.name << " <";
+				std::cout << tmp_email; // TODO
+				if (gm.names)
+					std::cout << ">";
+				std::cout << std::endl;
+			}
 		} else if (gm.json) {
-			std::cout << what << ',' << "\n\t\t\"role\": \"" << to_string(sb.role) << "\",\n\t\t" << "\"email\": \"";
-			if (gm.names)
-				std::cout << sb.name << " <";
-			std::cout << tmp_email; // TODO
-			if (gm.names)
-				std::cout << ">\"";
-			std::cout << "\n\t}";
+			std::cout << what << ','<< "\n\t\t\"roles\": [\"";
+			bool first = true;
+			for (const Person &p: sb) {
+				if (!first)
+					std::cout << "\", \"";
+				first = false;
+                                std::cout << to_string(p.role);
+			}
+			std::cout << "\"],\n\t\t" << "\"emails\": [\"";
+			first = true;
+			for (const Person &p: sb) {
+				if (!first)
+					std::cout << "\", \"";
+				first = false;
+				std::string tmp_email = translate_email(p.email); // TODO
+				if (gm.names)
+					std::cout << p.name << " <";
+				std::cout << tmp_email; // TODO
+				if (gm.names)
+					std::cout << ">";
+			}
+			std::cout << "\"]\n\t}";
 		} else {
-			std::cout << what << ',' << '"' << to_string(sb.role) << '"' << ',';
-			if (gm.names)
-				std::cout << sb.name << " <";
-			std::cout << tmp_email; // TODO
-			if (gm.names)
-				std::cout << ">";
+			std::cout << what << ',' << '"';
+			bool first = true;
+			for (const Person &p: sb) {
+				if (!first)
+					std::cout << '/';
+				first = false;
+				std::cout << to_string(p.role);
+			}
+			std::cout << '"' << ',';
+			first = true;
+			for (const Person &p: sb) {
+				if (!first)
+					std::cout << ',';
+				first = false;
+				std::string tmp_email = translate_email(p.email); // TODO
+				if (gm.names)
+					std::cout << p.name << " <";
+				std::cout << tmp_email; // TODO
+				if (gm.names)
+					std::cout << ">";
+			}
 			std::cout << std::endl;
 		}
 	}
