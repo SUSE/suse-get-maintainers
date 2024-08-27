@@ -141,8 +141,12 @@ directories.  This options is provided for convenience only.
 
 .TP
 .BR \-j ", " \-\-json
-Output JSON instead of CSV in batch mode.  This option has no effect
-for a single item.  This might change in the future.
+Output JSON.
+
+.TP
+.BR \-S ", " \-\-csv
+Output CSV.  This option is implied in batch mode and for multiple
+items, but can be overriden with \-\-json (\-j).
 
 .TP
 .BR \-n ", " \-\-names

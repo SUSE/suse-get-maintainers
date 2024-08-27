@@ -41,6 +41,7 @@ namespace {
 		bool rejected = false;
 		bool all_cves = false;
 		bool json = false;
+		bool csv = false;
 		bool names = false;
 		bool from_stdin = false;
 		bool trace = false;
@@ -111,7 +112,7 @@ int main(int argc, char **argv)
 		if (gm.from_stdin)
 			gm.paths = read_stdin_sans_new_lines();
 
-		if (gm.paths.size() > 1 || gm.from_stdin) {
+		if (gm.paths.size() > 1 || gm.json || gm.csv || gm.from_stdin) {
 			if (gm.json)
 				std::cout << "[\n";
 			bool first = true;
@@ -137,7 +138,7 @@ int main(int argc, char **argv)
 		if (gm.from_stdin)
 			gm.diffs = read_stdin_sans_new_lines();
 
-		if (gm.diffs.size() > 1 || gm.from_stdin) {
+		if (gm.diffs.size() > 1 || gm.json || gm.csv || gm.from_stdin) {
 			if (gm.json)
 				std::cout << "[\n";
 			bool first = true;
@@ -231,16 +232,9 @@ int main(int argc, char **argv)
 		if (rk.from_path(gm.kernel_tree))
 			fail_with_message("Unable load kernel tree: ", gm.kernel_tree, " (", git_error_last()->message, ")");
 
-		bool simple;
-		if (gm.shas.size() == 1 && gm.from_stdin && !has_cves) {
+		if (gm.shas.size() == 1 && gm.from_stdin && !has_cves)
 			gm.shas = read_stdin_sans_new_lines();
-			simple = false;
-		} else if (gm.shas.size() > 1 || (gm.shas.size() == 1 && gm.from_stdin && has_cves)) {
-			simple = false;
-		} else {
-			simple = true;
-			gm.json = false;
-		}
+		const bool simple = gm.shas.size() == 1 && !gm.from_stdin && !gm.csv && !gm.json;
 
 		validate_shas(gm.shas, has_cves ? 40 : 12);
 		bool first = true;
@@ -305,7 +299,8 @@ namespace {
 		os << "  --year, -y [year]             - Resolve all kernel CVEs from a given year; CSV output; use -j or --json option for JSON" << std::endl;
 		os << "  --refresh, -r                 - Refresh MAINTAINERS file and update (fetch origin) $VULNS_GIT and $LINUX_GIT if present" << std::endl;
 		os << "  --init, -i                    - Clone upstream repositories;  You need to provide at least -k or -v or both!" << std::endl;
-		os << "  --json, -j                    - Output JSON instead of CSV in batch mode; nop otherwise" << std::endl;
+		os << "  --json, -j                    - Output JSON" << std::endl;
+		os << "  --csv, -S                     - Output CSV" << std::endl;
 		os << "  --names, -n                   - Include full names with the emails; by default, just emails are extracted" << std::endl;
 		os << "  --no_translation, -N          - Do not translate to bugzilla emails" << std::endl;
 		os << "  --only_maintainers, -M        - Do not analyze the patches/commits; only MAINTAINERS files" << std::endl;
@@ -328,6 +323,7 @@ namespace {
 		{ "refresh", no_argument, nullptr, 'r' },
 		{ "init", no_argument, nullptr, 'i' },
 		{ "json", no_argument, nullptr, 'j' },
+		{ "csv", no_argument, nullptr, 'S' },
 		{ "names", no_argument, nullptr, 'n' },
 		{ "trace", no_argument, nullptr, 't' },
 		{ "no_translation", no_argument, nullptr, 'N' },
@@ -344,7 +340,7 @@ namespace {
 		for (;;) {
 			int opt_idx;
 
-			c = getopt_long(argc, argv, "hm:k:s:p:d:v:c:CRy:rijntNMV", opts, &opt_idx);
+			c = getopt_long(argc, argv, "hm:k:s:p:d:v:c:CRy:rijSntNMV", opts, &opt_idx);
 			if (c == -1)
 				break;
 
@@ -405,6 +401,9 @@ namespace {
 				break;
 			case 'j':
 				gm.json = true;
+				break;
+			case 'S':
+				gm.csv = true;
 				break;
 			case 'n':
 				gm.names = true;
