@@ -19,8 +19,8 @@ formats on stdout.  One can also ask for all kernel CVEs.  For
 advanced functionality (upstream hashs, CVE numbers) it requires
 access to a git kernel tree and git kernel vulnerability database.
 
-It's important to realize that if a git commit or a patch has one of
-the following:
+It's important to realize that if a git commit or a patch has at least
+one of the following:
 
 .RS
             Author/From
@@ -31,10 +31,11 @@ the following:
             Acked\-by
 .RE
 
-And the address seems to be a kernel maintainer from SUSE.
-suse\-get\-maintainers is not even looking further and reports that
-person as a maintainer regardless of what is in the MAINTAINERS file
-for the files touched by the commit/patch.
+And the address or addresses seem to be a kernel maintainer or
+maintainers from SUSE.  suse\-get\-maintainers is not even looking
+further at the MAINTAINERS file and reports that person or people as a
+maintainer or maintainers regardless of what is in the MAINTAINERS
+file for the files touched by the commit/patch.
 
 If the potential maintainers are found neither in commit/patch nor in
 the suse MAINTAINERS file, the upstream MAINTAINERS file is searched,
