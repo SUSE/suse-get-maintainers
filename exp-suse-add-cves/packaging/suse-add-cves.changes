@@ -1,13 +1,19 @@
 -------------------------------------------------------------------
+Wed Aug 28 08:13:41 PM CEST 2024 - Miroslav Franc <mfranc@suse.cz>
+
+- Update version 0.9.4
+  * add missing cve2bugzilla.h
+
+-------------------------------------------------------------------
 Wed Aug 28 08:09:58 PM CEST 2024 - Miroslav Franc <mfranc@suse.cz>
 
-- Update version grep: suse-get-maintainers.spec: No such file or directory
+- Update version 0.9.3
   * fix curl build failure, missing dependency + header file
 
 -------------------------------------------------------------------
 Wed Aug 28 07:54:03 PM CEST 2024 - Miroslav Franc <mfranc@suse.cz>
 
-- Update version grep: suse-get-maintainers.spec: No such file or directory
+- Update version 0.9.2
   * add --ksource_git or -k option to process $KSOURCE_GIT/patches.suse
   * add fetching cve2bugzilla.txt and updating bsc numbers in patches
 
