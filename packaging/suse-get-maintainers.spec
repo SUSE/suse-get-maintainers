@@ -1,5 +1,5 @@
 Name:           suse-get-maintainers
-Version:        1.0.7
+Version:        1.0.8
 Release:        0
 Summary:        A tool to identify SUSE maintainers responsible for particular kernel code
 License:        GPL-3.0-or-later

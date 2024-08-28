@@ -1,4 +1,13 @@
 -------------------------------------------------------------------
+Wed Aug 28 07:10:01 PM CEST 2024 - Miroslav Franc <mfranc@suse.cz>
+
+- Update version 1.0.8
+  * make --json (-j) work for a single input entry
+  * introduce --csv (-S) that also works for a single input entry
+  * improve patch/commit signoffs wording in the manpage
+  * accept patches generate by "git show", not just exportpatch
+
+-------------------------------------------------------------------
 Wed Aug 28 02:19:42 PM CEST 2024 - Miroslav Franc <mfranc@suse.cz>
 
 - Update version 1.0.7
