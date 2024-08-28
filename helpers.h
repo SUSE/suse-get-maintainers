@@ -179,8 +179,9 @@ namespace {
 		bool signoffs = true;
 		std::smatch match;
 		for (std::string line; std::getline(file, line); ) {
+			line.erase(0, line.find_first_not_of(" \t"));
 			if (!skip_signoffs && signoffs) {
-				if (line.starts_with("From")) {
+				if (line.starts_with("From") || line.starts_with("Author")) {
 					Person a{Role::Author};
 					if (parse_person(line, a.name, a.email) && is_suse_address(users, a.email))
 						people.push_back(std::move(a));
