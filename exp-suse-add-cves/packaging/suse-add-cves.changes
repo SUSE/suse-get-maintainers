@@ -1,4 +1,11 @@
 -------------------------------------------------------------------
+Wed Aug 28 07:54:03 PM CEST 2024 - Miroslav Franc <mfranc@suse.cz>
+
+- Update version grep: suse-get-maintainers.spec: No such file or directory
+  * add --ksource_git or -k option to process $KSOURCE_GIT/patches.suse
+  * add fetching cve2bugzilla.txt and updating bsc numbers in patches
+
+-------------------------------------------------------------------
 Tue May 21 07:48:13 PM CEST 2024 - Miroslav Franc <mfranc@suse.cz>
 
 - Update version: 0.9
