@@ -56,6 +56,9 @@ int main(int argc, char **argv)
 {
 	SGM_BEGIN;
 
+	std::cin.tie(nullptr);
+	std::ios::sync_with_stdio(false);
+
 	std::vector<Stanza> maintainers;
 	std::vector<Stanza> upstream_maintainers;
 	std::set<std::string> suse_users;
@@ -128,7 +131,7 @@ int main(int argc, char **argv)
 				for_all_stanzas(maintainers, upstream_maintainers, std::set<std::string>{p}, gm.json ? json_output : csv_output, what);
 			}
 			if (gm.json)
-				std::cout << "\n]" << std::endl;
+				std::cout << "\n]\n";
 		} else
 			for_all_stanzas(maintainers, upstream_maintainers, gm.paths, show_emails, "");
 		return 0;
@@ -167,7 +170,7 @@ int main(int argc, char **argv)
 				} catch (...) { continue; }
 			}
 			if (gm.json)
-				std::cout << "\n]" << std::endl;
+				std::cout << "\n]\n";
 		} else {
 			std::variant<std::set<std::string>, std::vector<Person>> s = get_paths_from_patch(*gm.diffs.cbegin(), suse_users, gm.only_maintainers);
 			if (gm.trace && std::holds_alternative<std::set<std::string>>(s)) {
@@ -269,7 +272,7 @@ int main(int argc, char **argv)
 				for_all_stanzas(maintainers, upstream_maintainers, paths, simple ? show_emails : gm.json ? json_output : csv_output, what);
 		});
 		if (gm.json)
-			std::cout << "\n]" << std::endl;
+			std::cout << "\n]\n";
 		return 0;
 	}
 
@@ -280,32 +283,32 @@ namespace {
 
 	void usage(const char *prog, std::ostream &os)
 	{
-		os << prog << " (version: " SUSE_GET_MAINTAINERS_VERSION ") For more information, read the man page." << std::endl;
-		os << "  --help, -h                    - Print this help message" << std::endl;
-		os << "  --maintainers, -m <file>      - Custom path to the MAINTAINERS file instead of $HOME/.cache/suse-get-maintainers/MAINTAINERS" << std::endl;
-		os << "  --kernel_tree, -k <dir>       - Clone of the mainline kernel repo ($LINUX_GIT)" << std::endl;
-		os << "  --vulns, -v <path>            - Path to the clone of https://git.kernel.org/pub/scm/linux/security/vulns.git ($VULNS_GIT)" << std::endl;
-		os << "  --sha, -s [<sha>|-]...        - SHA of a commit for which we want to find owners; - as stdin batch mode implies CSV output" << std::endl;
-		os << "                                  this option can be provided multiple times with different values" << std::endl;
-		os << "                                  SHA could be in shortened form of at least 12 characters" << std::endl;
-		os << "  --path, -p [<path>|-]...      - Path for which we want to find owners; - as stdin batch mode implies CSV output" << std::endl;
-		os << "                                  this option can be provided multiple times with different values" << std::endl;
-		os << "  --diff, -d [<path>|-]...      - Path to a patch we want to find owners; - as stdin batch mode implies CSV output" << std::endl;
-		os << "                                  this option can be provided multiple times with different values" << std::endl;
-		os << "  --cve, -c [<CVE number>|-]... - CVE number for which we want to find owners; - as stdin batch mode implies CSV output" << std::endl;
-		os << "                                  this option can be provided multiple times with different values" << std::endl;
-		os << "  --all_cves, -C                - Resolve all kernel CVEs and find owners for them; CSV output; use -j or --json option for JSON" << std::endl;
-		os << "  --rejected, -R                - Query rejected CVEs instead of the published ones.  To be used with -c, -C and -y." << std::endl;
-		os << "  --year, -y [year]             - Resolve all kernel CVEs from a given year; CSV output; use -j or --json option for JSON" << std::endl;
-		os << "  --refresh, -r                 - Refresh MAINTAINERS file and update (fetch origin) $VULNS_GIT and $LINUX_GIT if present" << std::endl;
-		os << "  --init, -i                    - Clone upstream repositories;  You need to provide at least -k or -v or both!" << std::endl;
-		os << "  --json, -j                    - Output JSON" << std::endl;
-		os << "  --csv, -S                     - Output CSV" << std::endl;
-		os << "  --names, -n                   - Include full names with the emails; by default, just emails are extracted" << std::endl;
-		os << "  --no_translation, -N          - Do not translate to bugzilla emails" << std::endl;
-		os << "  --only_maintainers, -M        - Do not analyze the patches/commits; only MAINTAINERS files" << std::endl;
-		os << "  --trace, -t                   - Be a bit more verbose about how we got there on STDERR" << std::endl;
-		os << "  --version, -V                 - Print just the version number" << std::endl;
+		os << prog << " (version: " SUSE_GET_MAINTAINERS_VERSION ") For more information, read the man page.\n";
+		os << "  --help, -h                    - Print this help message\n";
+		os << "  --maintainers, -m <file>      - Custom path to the MAINTAINERS file instead of $HOME/.cache/suse-get-maintainers/MAINTAINERS\n";
+		os << "  --kernel_tree, -k <dir>       - Clone of the mainline kernel repo ($LINUX_GIT)\n";
+		os << "  --vulns, -v <path>            - Path to the clone of https://git.kernel.org/pub/scm/linux/security/vulns.git ($VULNS_GIT)\n";
+		os << "  --sha, -s [<sha>|-]...        - SHA of a commit for which we want to find owners; - as stdin batch mode implies CSV output\n";
+		os << "                                  this option can be provided multiple times with different values\n";
+		os << "                                  SHA could be in shortened form of at least 12 characters\n";
+		os << "  --path, -p [<path>|-]...      - Path for which we want to find owners; - as stdin batch mode implies CSV output\n";
+		os << "                                  this option can be provided multiple times with different values\n";
+		os << "  --diff, -d [<path>|-]...      - Path to a patch we want to find owners; - as stdin batch mode implies CSV output\n";
+		os << "                                  this option can be provided multiple times with different values\n";
+		os << "  --cve, -c [<CVE number>|-]... - CVE number for which we want to find owners; - as stdin batch mode implies CSV output\n";
+		os << "                                  this option can be provided multiple times with different values\n";
+		os << "  --all_cves, -C                - Resolve all kernel CVEs and find owners for them; CSV output; use -j or --json option for JSON\n";
+		os << "  --rejected, -R                - Query rejected CVEs instead of the published ones.  To be used with -c, -C and -y.\n";
+		os << "  --year, -y [year]             - Resolve all kernel CVEs from a given year; CSV output; use -j or --json option for JSON\n";
+		os << "  --refresh, -r                 - Refresh MAINTAINERS file and update (fetch origin) $VULNS_GIT and $LINUX_GIT if present\n";
+		os << "  --init, -i                    - Clone upstream repositories;  You need to provide at least -k or -v or both!\n";
+		os << "  --json, -j                    - Output JSON\n";
+		os << "  --csv, -S                     - Output CSV\n";
+		os << "  --names, -n                   - Include full names with the emails; by default, just emails are extracted\n";
+		os << "  --no_translation, -N          - Do not translate to bugzilla emails\n";
+		os << "  --only_maintainers, -M        - Do not analyze the patches/commits; only MAINTAINERS files\n";
+		os << "  --trace, -t                   - Be a bit more verbose about how we got there on STDERR\n";
+		os << "  --version, -V                 - Print just the version number\n";
 	}
 
 	struct option opts[] = {
@@ -421,7 +424,7 @@ namespace {
 				gm.only_maintainers = true;
 				break;
 			case 'V':
-				std::cout << SUSE_GET_MAINTAINERS_VERSION << std::endl;
+				std::cout << SUSE_GET_MAINTAINERS_VERSION << '\n';
 				throw 0;
 			default:
 				usage(argv[0], std::cerr);
@@ -434,9 +437,9 @@ namespace {
 	{
 		m.for_all_maintainers([](const Person &p) {
 			if (gm.names && !p.name.empty())
-				std::cout << p.name << " <" << p.email << ">" << std::endl;
+				std::cout << p.name << " <" << p.email << ">\n";
 			else
-				std::cout << p.email << std::endl;
+				std::cout << p.email << '\n';
 		});
 	}
 
@@ -449,7 +452,7 @@ namespace {
 			else
 				std::cout << "," << p.email;
 		});
-		std::cout << std::endl;
+		std::cout << '\n';
 	}
 
 	void json_output(const Stanza &m, const std::string &what)
@@ -483,7 +486,7 @@ namespace {
 				std::cout << tmp_email; // TODO
 				if (gm.names)
 					std::cout << ">";
-				std::cout << std::endl;
+				std::cout << '\n';
 			}
 		} else if (gm.json) {
 			std::cout << what << ','<< "\n\t\t\"roles\": [\"";
@@ -530,7 +533,7 @@ namespace {
 				if (gm.names)
 					std::cout << ">";
 			}
-			std::cout << std::endl;
+			std::cout << '\n';
 		}
 	}
 
