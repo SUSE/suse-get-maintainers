@@ -21,6 +21,10 @@ bool do_not_translate = false;
 #define SGM_BEGIN try {
 #define SGM_END } catch (int ret) { return ret; } catch (...) { return 42; }
 
+#define T_GREEN "\033[01;32m"
+#define T_BLUE "\033[01;34m"
+#define T_END "\033[0m"
+
 namespace {
 	template<typename... Args> void fail_with_message(Args&&... args)
 	{
@@ -212,6 +216,18 @@ namespace {
 			if (ptr)
 				var = ptr;
 		}
+	}
+
+	template <typename T>
+	std::string color_format(bool b, const std::string &c, const T &s)
+	{
+		std::stringstream ret;
+		if (b)
+			ret << c;
+		ret << s;
+		if (b)
+			ret << T_END;
+		return ret.str();
 	}
 
 	// TODO

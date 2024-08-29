@@ -150,6 +150,13 @@ Output CSV.  This option is implied in batch mode and for multiple
 items, but can be overriden with \-\-json (\-j).
 
 .TP
+.BR \-a ", " \-\-colors_always
+Always show colors.  By default, the output is colored only when the
+standard output is connected to the terminal.  This option is useful
+for piping JSON output (with \-\-json or \-j) into the pager (less
+\-iR or similar).
+
+.TP
 .BR \-n ", " \-\-names
 Output full names along with emails ("Jane Doe <jane.doe@suse.cz>").
 By default only emails are printed ("jane.doe@suse.cz").  This might

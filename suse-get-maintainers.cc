@@ -3,7 +3,9 @@
 #include <set>
 #include <optional>
 #include <cstdio>
+#include <iomanip>
 #include <getopt.h>
+#include <unistd.h>
 
 #include "helpers.h"
 #include "git2.h"
@@ -49,6 +51,7 @@ namespace {
 		bool init = false;
 		bool no_translation = false;
 		bool only_maintainers = false;
+		bool colors = false;
 	} gm;
 }
 
@@ -64,6 +67,9 @@ int main(int argc, char **argv)
 	std::set<std::string> suse_users;
 
 	parse_options(argc, argv);
+
+	if (!gm.colors && isatty(1))
+		gm.colors = true;
 
 	if (gm.cves.empty() && gm.diffs.empty() && gm.shas.empty() && gm.paths.empty() && !gm.all_cves && !gm.refresh && !gm.init)
 		fail_with_message("You must provide either --sha (-s), --path (-p), --diff (-d), --cve (-c), --year (y), --all_cves (-C) or --init (-i)!  See --help (-h) for details!");
@@ -125,7 +131,8 @@ int main(int argc, char **argv)
 					if (!first)
 						what = ",\n";
 					first = false;
-					what += "\t{\n\t\t\"path\": \"" + p + "\"";
+					what += "  {\n    ";
+					what += color_format(gm.colors, T_BLUE, "\"path\"") + ": " + color_format(gm.colors, T_GREEN, "\"" + p + "\"");
 				} else
 					what = p;
 				for_all_stanzas(maintainers, upstream_maintainers, std::set<std::string>{p}, gm.json ? json_output : csv_output, what);
@@ -159,7 +166,8 @@ int main(int argc, char **argv)
 						if (!first)
 							what = ",\n";
 						first = false;
-						what += "\t{\n\t\t\"diff\": \"" + ps + "\"";
+						what += "  {\n    ";
+						what += color_format(gm.colors, T_BLUE, "\"diff\"") + ": " + color_format(gm.colors, T_GREEN, "\"" + ps + "\"");
 					} else
 						what = ps;
 					if (std::holds_alternative<std::vector<Person>>(s)) {
@@ -258,10 +266,10 @@ int main(int argc, char **argv)
 				if (!first)
 					what = ",\n";
 				first = false;
-				what += "\t{\n";
+				what += "  {\n";
 				if (has_cves)
-					what += "\t\t\"cve\": \"" + cve_hash_map.get_cve(sha) + "\",\n";
-				what += "\t\t\"sha\": \"" + sha + "\"";
+					what += "    " + color_format(gm.colors, T_BLUE, "\"cve\"") + ": " + color_format(gm.colors, T_GREEN,  "\"" + cve_hash_map.get_cve(sha) + "\"") + ",\n";
+				what += "    " + color_format(gm.colors, T_BLUE, "\"sha\"") + ": " + color_format(gm.colors, T_GREEN, "\"" + sha + "\"");
 			} else if (has_cves)
 				what = cve_hash_map.get_cve(sha) + "," + sha;
 			else
@@ -304,6 +312,7 @@ namespace {
 		os << "  --init, -i                    - Clone upstream repositories;  You need to provide at least -k or -v or both!\n";
 		os << "  --json, -j                    - Output JSON\n";
 		os << "  --csv, -S                     - Output CSV\n";
+		os << "  --colors_always, -a           - Always show colors; by default, they only show when the stdout is connected to the terminal\n";
 		os << "  --names, -n                   - Include full names with the emails; by default, just emails are extracted\n";
 		os << "  --no_translation, -N          - Do not translate to bugzilla emails\n";
 		os << "  --only_maintainers, -M        - Do not analyze the patches/commits; only MAINTAINERS files\n";
@@ -327,6 +336,7 @@ namespace {
 		{ "init", no_argument, nullptr, 'i' },
 		{ "json", no_argument, nullptr, 'j' },
 		{ "csv", no_argument, nullptr, 'S' },
+		{ "colors_always", no_argument, nullptr, 'a' },
 		{ "names", no_argument, nullptr, 'n' },
 		{ "trace", no_argument, nullptr, 't' },
 		{ "no_translation", no_argument, nullptr, 'N' },
@@ -343,7 +353,7 @@ namespace {
 		for (;;) {
 			int opt_idx;
 
-			c = getopt_long(argc, argv, "hm:k:s:p:d:v:c:CRy:rijSntNMV", opts, &opt_idx);
+			c = getopt_long(argc, argv, "hm:k:s:p:d:v:c:CRy:rijSantNMV", opts, &opt_idx);
 			if (c == -1)
 				break;
 
@@ -408,6 +418,9 @@ namespace {
 			case 'S':
 				gm.csv = true;
 				break;
+			case 'a':
+				gm.colors = true;
+				break;
 			case 'n':
 				gm.names = true;
 				break;
@@ -457,18 +470,17 @@ namespace {
 
 	void json_output(const Stanza &m, const std::string &what)
 	{
-		std::cout << what << ',' << "\n\t\t\"subsystem\": \"" << m.name << "\",\n\t\t" << "\"emails\": [";
+		std::cout << what << ',' << "\n    " << color_format(gm.colors, T_BLUE, "\"subsystem\"") << ": " <<
+			color_format(gm.colors, T_GREEN, std::quoted(m.name)) << ",\n    " << color_format(gm.colors, T_BLUE, "\"emails\"") << ": [\n      ";
 		bool first = true;
 		m.for_all_maintainers([&first](const Person &p) {
 			if (!first)
-				std::cout << ", ";
+				std::cout << ",\n      ";
 			first = false;
-			if (gm.names && !p.name.empty())
-				std::cout << "\"" << p.name << " <" << p.email << ">\"";
-			else
-				std::cout << "\"" << p.email << "\"";
+			const std::string who = gm.names && !p.name.empty() ? p.name + " <" + p.email + ">" : p.email;
+			std::cout << color_format(gm.colors, T_GREEN, std::quoted(who));
 		});
-		std::cout << "]\n\t}";
+		std::cout << "\n    ]\n  }";
 	}
 
 	void show_people(const std::vector<Person> &sb, const std::string &what, bool simple)
@@ -489,28 +501,25 @@ namespace {
 				std::cout << '\n';
 			}
 		} else if (gm.json) {
-			std::cout << what << ','<< "\n\t\t\"roles\": [\"";
+			std::cout << what << ',' << "\n    " << color_format(gm.colors, T_BLUE, "\"roles\"") << ": [\n      ";
 			bool first = true;
 			for (const Person &p: sb) {
 				if (!first)
-					std::cout << "\", \"";
+					std::cout << ",\n      ";
 				first = false;
-                                std::cout << to_string(p.role);
+                                std::cout << color_format(gm.colors, T_GREEN, std::quoted(to_string(p.role)));
 			}
-			std::cout << "\"],\n\t\t" << "\"emails\": [\"";
+			std::cout << "\n    ],\n    " << color_format(gm.colors, T_BLUE, "\"emails\"") << ": [\n      ";
 			first = true;
 			for (const Person &p: sb) {
 				if (!first)
-					std::cout << "\", \"";
+					std::cout << ",\n      ";
 				first = false;
-				std::string tmp_email = translate_email(p.email); // TODO
-				if (gm.names)
-					std::cout << p.name << " <";
-				std::cout << tmp_email; // TODO
-				if (gm.names)
-					std::cout << ">";
+				const std::string tmp_email = translate_email(p.email); // TODO
+				const std::string who = gm.names && !p.name.empty() ? p.name + " <" + tmp_email + ">" : tmp_email;
+				std::cout << color_format(gm.colors, T_GREEN, std::quoted(who));
 			}
-			std::cout << "\"]\n\t}";
+			std::cout << "\n    ]\n  }";
 		} else {
 			std::cout << what << ',' << '"';
 			bool first = true;
