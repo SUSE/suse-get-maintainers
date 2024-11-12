@@ -34,6 +34,7 @@ namespace {
 	struct gm {
 		std::string maintainers;
 		std::string kernel_tree;
+		std::string origin = "origin";
 		std::set<std::string> shas;
 		std::set<std::string> paths;
 		std::set<std::string> diffs;
@@ -108,13 +109,13 @@ int main(int argc, char **argv)
 
 	load_maintainers_file(maintainers, suse_users, gm.maintainers);
 	if (!gm.kernel_tree.empty())
-		load_upstream_maintainers_file(upstream_maintainers, suse_users, gm.kernel_tree);
+		load_upstream_maintainers_file(upstream_maintainers, suse_users, gm.kernel_tree, gm.origin);
 
 	if (gm.refresh) {
 		if (!gm.vulns.empty())
 			fetch_repo(gm.vulns, "origin");
 		if (!gm.kernel_tree.empty())
-			fetch_repo(gm.kernel_tree, "origin");
+			fetch_repo(gm.kernel_tree, gm.origin);
 	}
 
 	if (!gm.paths.empty()) {
@@ -295,6 +296,7 @@ namespace {
 		os << "  --help, -h                    - Print this help message\n";
 		os << "  --maintainers, -m <file>      - Custom path to the MAINTAINERS file instead of $HOME/.cache/suse-get-maintainers/MAINTAINERS\n";
 		os << "  --kernel_tree, -k <dir>       - Clone of the mainline kernel repo ($LINUX_GIT)\n";
+		os << "  --origin, -o <remote>         - Use some other remote than origin (useful only for $LINUX_GIT)\n";
 		os << "  --vulns, -v <path>            - Path to the clone of https://git.kernel.org/pub/scm/linux/security/vulns.git ($VULNS_GIT)\n";
 		os << "  --sha, -s [<sha>|-]...        - SHA of a commit for which we want to find owners; - as stdin batch mode implies CSV output\n";
 		os << "                                  this option can be provided multiple times with different values\n";
@@ -324,6 +326,7 @@ namespace {
 		{ "help", no_argument, nullptr, 'h' },
 		{ "maintainers", required_argument, nullptr, 'm' },
 		{ "kernel_tree", required_argument, nullptr, 'k' },
+		{ "origin", required_argument, nullptr, 'o' },
 		{ "sha", required_argument, nullptr, 's' },
 		{ "path", required_argument, nullptr, 'p' },
 		{ "diff", required_argument, nullptr, 'd' },
@@ -353,7 +356,7 @@ namespace {
 		for (;;) {
 			int opt_idx;
 
-			c = getopt_long(argc, argv, "hm:k:s:p:d:v:c:CRy:rijSantNMV", opts, &opt_idx);
+			c = getopt_long(argc, argv, "hm:k:o:s:p:d:v:c:CRy:rijSantNMV", opts, &opt_idx);
 			if (c == -1)
 				break;
 
@@ -366,6 +369,9 @@ namespace {
 				break;
 			case 'k':
 				gm.kernel_tree = optarg;
+				break;
+			case 'o':
+				gm.origin = optarg;
 				break;
 			case 's':
 				option = optarg;

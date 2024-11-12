@@ -162,17 +162,17 @@ namespace {
 			fail_with_message(filename, " appears to be empty");
 	}
 
-	void load_upstream_maintainers_file(std::vector<Stanza> &stanzas, const std::set<std::string> &suse_users, const std::string &lsource)
+	void load_upstream_maintainers_file(std::vector<Stanza> &stanzas, const std::set<std::string> &suse_users, const std::string &lsource, const std::string &origin)
 	{
 		Repo linux_repo;
 
 		if (linux_repo.from_path(lsource))
 			fail_with_message("Unable to open linux.git at ", lsource, " ;", git_error_last()->message);
 
-		const std::string error_message = "Unable to load linux.git tree for origin/master; ";
+		const std::string error_message = "Unable to load linux.git tree for " + origin + "/master; ";
 
 		Object obj;
-		if (obj.from_rev(linux_repo, "origin/master"))
+		if (obj.from_rev(linux_repo, origin + "/master"))
 			fail_with_message(error_message, git_error_last()->message);
 
 		Commit commit;
