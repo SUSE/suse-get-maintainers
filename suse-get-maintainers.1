@@ -112,6 +112,11 @@ with different value.  The batch mode also implies output in CSV format for
 easy processing, but you can request JSON fromat with \-j option.
 
 .TP
+.BR \-w ", " \-\-whois =[\fIREGEX\fR]
+Grep maintainers and show the maintained subsystem for the matches.
+Currently doesn't support JSON output.
+
+.TP
 .BR \-R ", " \-\-rejected
 Query rejected CVE numbers instead of the published ones.  To be used
 with \-c, \-C and \-y.
