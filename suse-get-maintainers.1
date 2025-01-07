@@ -112,9 +112,14 @@ with different value.  The batch mode also implies output in CSV format for
 easy processing, but you can request JSON fromat with \-j option.
 
 .TP
-.BR \-w ", " \-\-whois =[\fIREGEX\fR]
-Grep maintainers and show the maintained subsystem for the matches.
-Currently doesn't support JSON output.
+.BR \-w ", " \-\-whois =[\fIEMAIL\fR|\fIUSERNAME\fR]
+Look-up a maintainer and show list of subsystems, one per line.
+
+.TP
+.BR \-g ", " \-\-grep =[\fIREGEX\fR]
+Grep maintainers (both emails and names) and subsystems and show the
+email and maintained subsystem for the matches.  Currently doesn't
+support JSON output.
 
 .TP
 .BR \-R ", " \-\-rejected
