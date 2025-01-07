@@ -125,7 +125,7 @@ int main(int argc, char **argv)
 	if (!gm.grep.empty()) {
 		if (!grep(maintainers, gm.grep, gm.names))
 			if (!grep(upstream_maintainers, gm.grep, gm.names))
-				fail_with_message("unable to find a match for " + gm.grep + "in maintainers or subsystems");
+				fail_with_message("unable to find a match for " + gm.grep + " in maintainers or subsystems");
 		return 0;
 	}
 
