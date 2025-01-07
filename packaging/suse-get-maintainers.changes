@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Tue Jan  7 03:35:01 PM CET 2025 - Miroslav Franc <mfranc@suse.cz>
+
+- Update version 1.1.1
+  * add --whois (-w) for greping maintainers
+
+-------------------------------------------------------------------
 Tue Nov 12 09:20:18 AM CET 2024 - Miroslav Franc <mfranc@suse.cz>
 
 - Update version 1.1.0
