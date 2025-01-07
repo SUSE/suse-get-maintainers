@@ -23,7 +23,7 @@ namespace {
 	void csv_output(const Stanza &m, const std::string&);
 	void json_output(const Stanza &m, const std::string&);
 	void show_people(const std::vector<Person> &, const std::string &, bool);
-	bool whois(const std::vector<Stanza> &, const std::string &, bool);
+	bool whois(const std::vector<Stanza> &, const std::string &);
 	bool grep(const std::vector<Stanza> &, const std::string &, bool);
 	std::set<std::string> read_stdin_sans_new_lines();
 	template<typename F>
@@ -116,8 +116,8 @@ int main(int argc, char **argv)
 		load_upstream_maintainers_file(upstream_maintainers, suse_users, gm.kernel_tree, gm.origin);
 
 	if (!gm.whois.empty()) {
-		if (!whois(maintainers, gm.whois, gm.names))
-			if (!whois(upstream_maintainers, gm.whois, gm.names))
+		if (!whois(maintainers, gm.whois))
+			if (!whois(upstream_maintainers, gm.whois))
 				fail_with_message("unable to find " + gm.whois + " among maintainers");
 		return 0;
 	}
@@ -580,11 +580,11 @@ namespace {
 		}
 	}
 
-	bool whois(const std::vector<Stanza> &stanzas, const std::string &whois, bool names)
+	bool whois(const std::vector<Stanza> &stanzas, const std::string &whois)
 	{
 		bool found = false;
 		for (const auto& s: stanzas) {
-			s.for_all_maintainers([&s, &whois, &found, names](const Person &p) {
+			s.for_all_maintainers([&s, &whois, &found](const Person &p) {
 				if (p.email == whois || p.email.starts_with(whois + "@")) {
 					std::cout << s.name << "\n";
 					found = true;
