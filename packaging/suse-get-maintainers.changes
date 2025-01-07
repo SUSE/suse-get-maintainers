@@ -1,4 +1,11 @@
 -------------------------------------------------------------------
+Tue Jan  7 04:33:43 PM CET 2025 - Miroslav Franc <mfranc@suse.cz>
+
+- Update version 1.1.2
+  * rename --whois (-w) to --grep (-g)
+  * add --whois (-w) for matching email and usernames only
+
+-------------------------------------------------------------------
 Tue Jan  7 03:35:01 PM CET 2025 - Miroslav Franc <mfranc@suse.cz>
 
 - Update version 1.1.1
