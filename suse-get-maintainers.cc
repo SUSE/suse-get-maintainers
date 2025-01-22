@@ -25,6 +25,7 @@ namespace {
 	void show_people(const std::vector<Person> &, const std::string &, bool);
 	bool whois(const std::vector<Stanza> &, const std::string &);
 	bool grep(const std::vector<Stanza> &, const std::string &, bool);
+	bool fixes(const std::vector<Stanza> &, const std::string &, bool);
 	std::set<std::string> read_stdin_sans_new_lines();
 	template<typename F>
 	void for_all_stanzas(const std::vector<Stanza> &,
@@ -43,6 +44,7 @@ namespace {
 		std::string vulns;
 		std::string whois;
 		std::string grep;
+		std::string fixes;
 		std::set<std::string> cves;
 		int year = 0;
 		bool rejected = false;
@@ -76,17 +78,17 @@ int main(int argc, char **argv)
 	if (!gm.colors && isatty(1))
 		gm.colors = true;
 
-	if (gm.cves.empty() && gm.diffs.empty() && gm.shas.empty() && gm.paths.empty() && !gm.all_cves && !gm.refresh && !gm.init && gm.whois.empty() && gm.grep.empty())
-		fail_with_message("You must provide either --sha (-s), --path (-p), --diff (-d), --cve (-c), --year (y), --all_cves (-C), --init (-i), --grep (-g) or --whois (-w)!  See --help (-h) for details!");
+	if (gm.cves.empty() && gm.diffs.empty() && gm.shas.empty() && gm.paths.empty() && !gm.all_cves && !gm.refresh && !gm.init && gm.whois.empty() && gm.grep.empty() && gm.fixes.empty())
+		fail_with_message("You must provide either --sha (-s), --path (-p), --diff (-d), --cve (-c), --year (y), --all_cves (-C), --init (-i), --grep (-g), --whois (-w) or --fixes (-f)!  See --help (-h) for details!");
 
 	if (gm.init && (gm.kernel_tree.empty() && gm.vulns.empty()))
 		fail_with_message("You must provide at least --kernel_tree (-k) or --vulns (-v) or both!");
 
 	constexpr const char maintainers_url[] = "https://kerncvs.suse.de/MAINTAINERS";
-	gm.maintainers = fetch_file_if_needed(gm.maintainers, "MAINTAINERS", maintainers_url, gm.trace, gm.refresh);
+	gm.maintainers = fetch_file_if_needed(gm.maintainers, "MAINTAINERS", maintainers_url, gm.trace, gm.refresh, false);
 
 	// TODO
-	temporary = fetch_file_if_needed(std::string(), "user-bugzilla-map.txt", "https://kerncvs.suse.de/user-bugzilla-map.txt", gm.trace, gm.refresh);
+	temporary = fetch_file_if_needed(std::string(), "user-bugzilla-map.txt", "https://kerncvs.suse.de/user-bugzilla-map.txt", gm.trace, gm.refresh, false);
 	load_temporary(translation_table, temporary);
 	// END TODO
 
@@ -114,6 +116,13 @@ int main(int argc, char **argv)
 	load_maintainers_file(maintainers, suse_users, gm.maintainers);
 	if (!gm.kernel_tree.empty())
 		load_upstream_maintainers_file(upstream_maintainers, suse_users, gm.kernel_tree, gm.origin);
+
+	if (!gm.fixes.empty()) {
+		if (!fixes(maintainers, gm.fixes, gm.trace))
+			fail_with_message("unable to find a match for " + gm.fixes + " in maintainers or subsystems");
+		return 0;
+	}
+
 
 	if (!gm.whois.empty()) {
 		if (!whois(maintainers, gm.whois))
@@ -327,6 +336,7 @@ namespace {
 		os << "                                  this option can be provided multiple times with different values\n";
 		os << "  --whois, -w [EMAIL|USERNAME]  - Look-up a maintainer and show his subsystems\n";
 		os << "  --grep, -g [REGEX]            - Grep maintainers (both emails and names) and subsystems and show the list of maintainer,subsystem for the matches; doesn't support -j yet\n";
+		os << "  --fixes, -f [REGEX]           - Grep maintainers (both emails and names) and subsystems and show the list of current fixes for the matches (EXPERIMENTAL)\n";
 		os << "  --all_cves, -C                - Resolve all kernel CVEs and find owners for them; CSV output; use -j or --json option for JSON\n";
 		os << "  --rejected, -R                - Query rejected CVEs instead of the published ones.  To be used with -c, -C and -y.\n";
 		os << "  --year, -y [year]             - Resolve all kernel CVEs from a given year; CSV output; use -j or --json option for JSON\n";
@@ -354,6 +364,7 @@ namespace {
 		{ "cve", required_argument, nullptr, 'c' },
 		{ "whois", required_argument, nullptr, 'w' },
 		{ "grep", required_argument, nullptr, 'g' },
+		{ "fixes", required_argument, nullptr, 'f' },
 		{ "rejected", no_argument, nullptr, 'R' },
 		{ "all_cves", no_argument, nullptr, 'C' },
 		{ "year", required_argument, nullptr, 'y' },
@@ -378,7 +389,7 @@ namespace {
 		for (;;) {
 			int opt_idx;
 
-			c = getopt_long(argc, argv, "hm:k:o:s:p:d:v:c:w:g:CRy:rijSantNMV", opts, &opt_idx);
+			c = getopt_long(argc, argv, "hm:k:o:s:p:d:v:c:w:g:f:CRy:rijSantNMV", opts, &opt_idx);
 			if (c == -1)
 				break;
 
@@ -427,6 +438,9 @@ namespace {
 				break;
 			case 'g':
 				gm.grep = optarg;
+				break;
+			case 'f':
+				gm.fixes = optarg;
 				break;
 			case 'C':
 				gm.all_cves = true;
@@ -617,6 +631,44 @@ namespace {
 					fail_with_message(grep + ": " + e.what());
 				}
 			});
+		}
+		return found;
+	}
+
+	bool fixes(const std::vector<Stanza> &stanzas, const std::string &grep, bool trace)
+	{
+		const auto re = std::regex(grep, std::regex::icase | std::regex::optimize);
+		bool found = false;
+		std::set<std::string> files;
+		for (const auto& s: stanzas) {
+			s.for_all_maintainers([&re, &s, &grep, &found, &files](const Person &p) {
+				try {
+					std::smatch email_match, name_match, subsystem_match;
+					std::regex_search(p.email, email_match, re);
+					std::regex_search(p.name, name_match, re);
+					std::regex_search(s.name, name_match, re);
+					if (!email_match.empty() || !name_match.empty() || !subsystem_match.empty()) {
+						files.insert(maintainer_file_name_from_subsystem(s.name));
+						found = true;
+					}
+				} catch (const std::regex_error& e) {
+					fail_with_message(grep + ": " + e.what());
+				}
+			});
+		}
+		for (const auto &mf: files) {
+			std::string mf_on_the_disk = fetch_file_if_needed(std::string(), mf, "http://fixes.prg2.suse.org/current/" + mf, trace, false, true);
+			std::cout << "--------------------------------------------------------------------------------\n";
+			if (!mf_on_the_disk.empty()) {
+				if (trace)
+					emit_message(mf_on_the_disk);
+				std::ifstream file{mf_on_the_disk};
+				if (!file.is_open())
+					fail_with_message("Unable to open file: ", mf_on_the_disk);
+				for (std::string line; getline(file, line);)
+					std::cout << line << '\n';
+			} else
+				std::cout << "No fixes for " << mf << ".\n";
 		}
 		return found;
 	}

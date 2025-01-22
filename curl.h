@@ -49,7 +49,7 @@ namespace
 		FILE* m_pagefile;
 	};
 
-	std::string fetch_file_if_needed(std::string maintainers_path, const std::string &name, const std::string &url, bool trace, bool refresh)
+	std::string fetch_file_if_needed(std::string maintainers_path, const std::string &name, const std::string &url, bool trace, bool refresh, bool ignore_errors)
 	{
 		if (!maintainers_path.empty())
 			return maintainers_path;
@@ -102,6 +102,8 @@ namespace
 		if (pagefile) {
 			curl_easy_setopt(curl_handle.get(), CURLOPT_WRITEDATA, pagefile.get());
 			if (curl_easy_perform(curl_handle.get())) {
+				if (ignore_errors)
+					return "";
 				emit_message("Failed to fetch ", name, " from ", url, " to ", maintainers_path);
 				if (file_already_exists)
 					return maintainers_path;
@@ -111,6 +113,8 @@ namespace
 			long http_code = 0;
 			curl_easy_getinfo(curl_handle.get(), CURLINFO_RESPONSE_CODE, &http_code);
 			if (http_code >= 400) {
+				if (ignore_errors)
+					return "";
 				emit_message("Failed to fetch ", name," (", http_code, ") from ", url, " to ", maintainers_path);
 				if (file_already_exists)
 					return maintainers_path;

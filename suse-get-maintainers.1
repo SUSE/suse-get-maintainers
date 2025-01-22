@@ -122,6 +122,11 @@ email and maintained subsystem for the matches.  Currently doesn't
 support JSON output.
 
 .TP
+.BR \-f ", " \-\-fixes =[\fIREGEX\fR]
+Grep maintainers (both emails and names) and subsystems and show the
+current fixes for the matches. (EXPERIMENTAL)
+
+.TP
 .BR \-R ", " \-\-rejected
 Query rejected CVE numbers instead of the published ones.  To be used
 with \-c, \-C and \-y.
@@ -324,6 +329,9 @@ $ suse\-get\-maintainers \-C | grep miroslav.franc
 Fetch supported branches automatically and search SUSE patches in them
 for potential maintainers.  Fetch a mapping from usernames to LDAP
 usernames and ask LDAP with curl for a bugzilla email.
+
+.SH BUGS
+Report any bugs to <mfranc@suse.cz>.
 
 .SH AUTHORS
 

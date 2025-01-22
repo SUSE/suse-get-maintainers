@@ -9,6 +9,7 @@
 #include <cstddef>
 #include <set>
 #include <regex>
+#include <cstring>
 #include <string_view>
 
 // TODO
@@ -228,6 +229,18 @@ namespace {
 		if (b)
 			ret << T_END;
 		return ret.str();
+	}
+
+	std::string maintainer_file_name_from_subsystem(std::string s)
+	{
+		std::transform(s.cbegin(), s.cend(), s.begin(), [](char c) -> char {
+			if (isspace(c) || c == '/')
+				return '_';
+			if (isalpha(c))
+				return static_cast<char>(tolower(c));
+			return c;
+		});
+		return s;
 	}
 
 	// TODO
