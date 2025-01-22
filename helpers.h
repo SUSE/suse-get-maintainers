@@ -234,10 +234,10 @@ namespace {
 	std::string maintainer_file_name_from_subsystem(std::string s)
 	{
 		std::transform(s.cbegin(), s.cend(), s.begin(), [](char c) -> char {
-			if (isspace(c) || c == '/')
+			if (!::isalnum(c))
 				return '_';
-			if (isalpha(c))
-				return static_cast<char>(tolower(c));
+			if (::isupper(c))
+				return ::tolower(c);
 			return c;
 		});
 		return s;
