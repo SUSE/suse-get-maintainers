@@ -1,5 +1,5 @@
 Name:           suse-get-maintainers
-Version:        1.1.4
+Version:        1.1.5
 Release:        0
 Summary:        A tool to identify SUSE maintainers responsible for particular kernel code
 License:        GPL-3.0-or-later
@@ -28,7 +28,7 @@ and git kernel vulnerability database.
 %autosetup
 
 %build
-%if 0%{?suse_version} < 1550 && 0%{?sle_version} <= 150600
+%if 0%{?suse_version} < 1550 && 0%{?sle_version} <= 150700
 %make_build CXX=g++-13 SGM_VERSION=%{version} %{name}
 %else
 %make_build SGM_VERSION=%{version} %{name}

@@ -231,16 +231,21 @@ namespace {
 		return ret.str();
 	}
 
-	std::string maintainer_file_name_from_subsystem(std::string s)
+	// unfortunately, the current format is required by tracking fixes v2
+	std::string maintainer_file_name_from_subsystem(const std::string &s)
 	{
-		std::transform(s.cbegin(), s.cend(), s.begin(), [](char c) -> char {
-			if (!::isalnum(c))
-				return '_';
-			if (::isupper(c))
-				return ::tolower(c);
-			return c;
-		});
-		return s;
+		std::string ret;
+		for (char c: s) {
+			if (isspace(c) || c == '/')
+				ret.push_back('_');
+			else if (isalnum(c))
+				ret.push_back(tolower(c));
+		}
+		if (ret.empty()) {
+			fail_with_message("The subsystem name \"" + s + "\" is so bizarre that it ended up being empty!");
+			throw 1;
+		}
+		return ret;
 	}
 
 	// TODO

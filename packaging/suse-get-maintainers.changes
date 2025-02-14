@@ -1,4 +1,11 @@
 -------------------------------------------------------------------
+Fri Feb 14 03:51:24 PM CET 2025 - Miroslav Franc <mfranc@suse.cz>
+
+- Update version 1.1.5
+  * sync --fixes, -f with tracking-fixes v2 properly
+  * fix building on SLE15-SP7
+
+-------------------------------------------------------------------
 Wed Jan 22 09:29:32 PM CET 2025 - Miroslav Franc <mfranc@suse.cz>
 
 - Update version 1.1.4
