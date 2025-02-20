@@ -1,5 +1,5 @@
 Name:           suse-add-cves
-Version:        0.9.5
+Version:        0.9.6
 Release:        0
 Summary:        A tool to update CVE reference in patches
 License:        GPL-3.0-or-later

@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Thu Feb 20 03:52:04 PM CET 2025 - Miroslav Franc <mfranc@suse.cz>
+
+- Update version 0.9.6
+  * fix fetch_file_if_needed call sites
+
+-------------------------------------------------------------------
 Thu Feb 20 03:43:08 PM CET 2025 - Miroslav Franc <mfranc@suse.cz>
 
 - Update version 0.9.5
