@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Thu Feb 20 03:43:08 PM CET 2025 - Miroslav Franc <mfranc@suse.cz>
+
+- Update version 0.9.5
+  * fix SP7 build
+
+-------------------------------------------------------------------
 Wed Aug 28 08:13:41 PM CEST 2024 - Miroslav Franc <mfranc@suse.cz>
 
 - Update version 0.9.4
