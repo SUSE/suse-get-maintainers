@@ -1,5 +1,5 @@
 Name:           suse-get-maintainers
-Version:        1.1.5
+Version:        1.1.6
 Release:        0
 Summary:        A tool to identify SUSE maintainers responsible for particular kernel code
 License:        GPL-3.0-or-later
@@ -8,7 +8,7 @@ URL:            https://gitlab.suse.de/mfranc/tracking-fixes
 Source:         %{name}-%{version}.tar.xz
 BuildRequires:  libgit2-devel
 BuildRequires:  libcurl-devel
-%if 0%{?suse_version} < 1550 && 0%{?sle_version} <= 150600
+%if 0%{?sle_version} > 0
 BuildRequires:  gcc13-c++
 %else
 BuildRequires:  gcc-c++
@@ -28,7 +28,7 @@ and git kernel vulnerability database.
 %autosetup
 
 %build
-%if 0%{?suse_version} < 1550 && 0%{?sle_version} <= 150700
+%if 0%{?sle_version} > 0
 %make_build CXX=g++-13 SGM_VERSION=%{version} %{name}
 %else
 %make_build SGM_VERSION=%{version} %{name}

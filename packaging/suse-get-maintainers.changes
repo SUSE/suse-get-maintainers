@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Thu Feb 20 03:35:58 PM CET 2025 - Miroslav Franc <mfranc@suse.cz>
+
+- Update version 1.1.6
+  * yet another attempt to fix SLE15-SP7 build
+
+-------------------------------------------------------------------
 Fri Feb 14 03:51:24 PM CET 2025 - Miroslav Franc <mfranc@suse.cz>
 
 - Update version 1.1.5
