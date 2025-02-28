@@ -69,7 +69,7 @@ namespace {
 		for (const auto &[file, sha]: fc.m_contents) {
 			const std::string_view sha_hash = trim(sha);
 			if (!is_hex(sha_hash) || sha_hash.size() != 40) {
-				emit_message(sha_hash, " doesn't seem to be a commit hash!");
+				emit_message('"', sha_hash, "\" doesn't seem to be a commit hash! (from a file \"", file, "\")");
 				continue;
 			}
 			std::smatch match;
