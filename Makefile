@@ -1,7 +1,7 @@
 ARCH := $(shell uname -p)
 SGM_VERSION=devel
 CXX = g++
-CXXFLAGS=-O3 -std=c++20 -fPIE -g -Wall -Wextra -Wno-dangling-else -DSUSE_GET_MAINTAINERS_VERSION=\"${SGM_VERSION}\"
+CXXFLAGS=-O3 -std=c++20 -fPIE -g -Wall -Wextra -Wno-dangling-else -Wno-unused-function -DSUSE_GET_MAINTAINERS_VERSION=\"${SGM_VERSION}\"
 ifeq ($(ARCH),x86_64)
 CXXFLAGS+=-march=x86-64-v2
 endif

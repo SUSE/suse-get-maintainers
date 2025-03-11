@@ -12,6 +12,7 @@
 #include "cves.h"
 #include "curl.h"
 #include "maintainers.h"
+#include "exp-suse-add-cves/cve2bugzilla.h"
 // TODO
 #include "temporary.h"
 // END TODO
@@ -25,7 +26,7 @@ namespace {
 	void show_people(const std::vector<Person> &, const std::string &, bool);
 	bool whois(const std::vector<Stanza> &, const std::string &);
 	bool grep(const std::vector<Stanza> &, const std::string &, bool);
-	bool fixes(const std::vector<Stanza> &, const std::string &, bool);
+	bool fixes(const std::vector<Stanza> &, const std::string &, bool, const CVEHashMap &, const CVE2Bugzilla &);
 	std::set<std::string> read_stdin_sans_new_lines();
 	template<typename F>
 	void for_all_stanzas(const std::vector<Stanza> &,
@@ -118,7 +119,15 @@ int main(int argc, char **argv)
 		load_upstream_maintainers_file(upstream_maintainers, suse_users, gm.kernel_tree, gm.origin);
 
 	if (!gm.fixes.empty()) {
-		if (!fixes(maintainers, gm.fixes, gm.trace))
+		CVEHashMap cve_hash_map{gm.year, gm.rejected, true};
+		if (!cve_hash_map.load(gm.vulns))
+			fail_with_message("Unable to load kernel vulns database git tree: ", gm.vulns);
+		constexpr const char cve2bugzilla_url[] = "https://gitlab.suse.de/security/cve-database/-/raw/master/data/cve2bugzilla";
+		std::string cve2bugzilla_file = fetch_file_if_needed(std::string(), "cve2bugzilla.txt", cve2bugzilla_url, false, false, false);
+		CVE2Bugzilla cve_to_bugzilla;
+		if (!cve_to_bugzilla.load(cve2bugzilla_file))
+			fail_with_message("Couldn't load cve2bugzilla.txt");
+		if (!fixes(maintainers, gm.fixes, gm.trace, cve_hash_map, cve_to_bugzilla))
 			fail_with_message("unable to find a match for " + gm.fixes + " in maintainers or subsystems");
 		return 0;
 	}
@@ -223,7 +232,7 @@ int main(int argc, char **argv)
 		return 0;
 	}
 
-	CVEHashMap cve_hash_map{gm.year, gm.rejected};
+	CVEHashMap cve_hash_map{gm.year, gm.rejected, false};
 	bool has_cves = false;
 
 	if (!gm.cves.empty() || gm.all_cves) {
@@ -635,7 +644,7 @@ namespace {
 		return found;
 	}
 
-	bool fixes(const std::vector<Stanza> &stanzas, const std::string &grep, bool trace)
+	bool fixes(const std::vector<Stanza> &stanzas, const std::string &grep, bool trace, const CVEHashMap &cve_hash_map, const CVE2Bugzilla &cve_to_bugzilla)
 	{
 		const auto re = std::regex(grep, std::regex::icase | std::regex::optimize);
 		bool found = false;
@@ -665,8 +674,23 @@ namespace {
 				std::ifstream file{mf_on_the_disk};
 				if (!file.is_open())
 					fail_with_message("Unable to open file: ", mf_on_the_disk);
-				for (std::string line; getline(file, line);)
+				for (std::string line; getline(file, line);) {
+					std::string possible_cve;
+					if (line.size() > 13 && line[12] == ' ')
+					{
+						const auto possible_sha = line.substr(0, 12);
+						if (is_hex(possible_sha))
+							possible_cve = cve_hash_map.get_cve_douze(possible_sha);
+					}
 					std::cout << line << '\n';
+					if (!possible_cve.empty()) {
+						std::cout << "        " << possible_cve;
+						const std::string possible_bsc = cve_to_bugzilla.get_bsc(possible_cve);
+						if (!possible_bsc.empty())
+							std::cout << " https://bugzilla.suse.com/show_bug.cgi?id=" << possible_bsc.substr(4);
+						std::cout << '\n';
+					}
+				}
 			} else
 				std::cout << "No fixes for " << mf << ".\n";
 		}

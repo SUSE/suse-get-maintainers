@@ -11,17 +11,20 @@
 
 namespace {
 	struct CVEHashMap {
-		CVEHashMap(int y, bool r) : year(y), rejected(r) {}
+		CVEHashMap(int y, bool r, bool d) : year(y), rejected(r), douze(d) {}
 
 		bool load(const std::string &vsource);
 		std::string get_sha(const std::string &cve_number) const;
 		std::string get_cve(const std::string &sha_commit) const;
+		std::string get_cve_douze(const std::string &sha_commit) const;
 		std::set<std::string> get_all_cves() const;
 	private:
 		std::unordered_map<std::string, std::string> m_cve_hash_map;
 		std::unordered_map<std::string, std::string> m_sha_hash_map;
+		std::unordered_map<std::string, std::string> m_douze_hash_map;
 		int year;
 		bool rejected;
+		bool douze;
 	};
 
 	bool CVEHashMap::load(const std::string &vsource)
@@ -79,8 +82,12 @@ namespace {
 				emit_message(cve_number, " doesn't seem to be a cve number!");
 				continue;
 			}
-			m_cve_hash_map.insert(std::make_pair(cve_number, sha_hash));
-			m_sha_hash_map.insert(std::make_pair(std::move(sha_hash), std::move(cve_number)));
+			if (douze)
+				m_douze_hash_map.insert(std::make_pair(sha_hash.substr(0, 12), std::move(cve_number)));
+			else {
+				m_cve_hash_map.insert(std::make_pair(cve_number, sha_hash));
+				m_sha_hash_map.insert(std::make_pair(std::move(sha_hash), std::move(cve_number)));
+			}
 		}
 		return true;
 	}
@@ -98,6 +105,15 @@ namespace {
 	{
 		const auto it = m_sha_hash_map.find(sha_commit);
 		if (it != m_sha_hash_map.cend())
+			return it->second;
+
+		return std::string();
+	}
+
+	std::string CVEHashMap::get_cve_douze(const std::string &sha_commit) const
+	{
+		const auto it = m_douze_hash_map.find(sha_commit);
+		if (it != m_douze_hash_map.cend())
 			return it->second;
 
 		return std::string();

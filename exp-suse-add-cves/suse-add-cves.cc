@@ -84,7 +84,7 @@ int main(int argc, char **argv)
 		}
 	}
 
-	CVEHashMap cve_hash_map{0, false};
+	CVEHashMap cve_hash_map{0, false, false};
 	if (!cve_hash_map.load(gm.vulns))
 		fail_with_message("Couldn't load kernel vulns database git tree");
 
