@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Tue Mar 11 03:32:51 PM CET 2025 - Miroslav Franc <mfranc@suse.cz>
+
+- Update version 1.1.8
+  * experimentally enable adding CVE info to the git-fixes
+
+-------------------------------------------------------------------
 Fri Feb 28 01:14:28 PM CET 2025 - Miroslav Franc <mfranc@suse.cz>
 
 - Update version 1.1.7
