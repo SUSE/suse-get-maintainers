@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Tue Mar 11 03:43:40 PM CET 2025 - Miroslav Franc <mfranc@suse.cz>
+
+- Update version 1.1.9
+  * fix a build failure due to a missing header
+
+-------------------------------------------------------------------
 Tue Mar 11 03:32:51 PM CET 2025 - Miroslav Franc <mfranc@suse.cz>
 
 - Update version 1.1.8
