@@ -12,7 +12,7 @@
 #include "cves.h"
 #include "curl.h"
 #include "maintainers.h"
-#include "exp-suse-add-cves/cve2bugzilla.h"
+#include "cve2bugzilla.h"
 // TODO
 #include "temporary.h"
 // END TODO
