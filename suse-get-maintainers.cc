@@ -627,7 +627,7 @@ namespace {
 					std::smatch email_match, name_match, subsystem_match;
 					std::regex_search(p.email, email_match, re);
 					std::regex_search(p.name, name_match, re);
-					std::regex_search(s.name, name_match, re);
+					std::regex_search(s.name, subsystem_match, re);
 					if (!email_match.empty() || !name_match.empty() || !subsystem_match.empty()) {
 						if (names)
 							std::cout << '"' << p.name << " <" << p.email << ">\"";
@@ -655,7 +655,7 @@ namespace {
 					std::smatch email_match, name_match, subsystem_match;
 					std::regex_search(p.email, email_match, re);
 					std::regex_search(p.name, name_match, re);
-					std::regex_search(s.name, name_match, re);
+					std::regex_search(s.name, subsystem_match, re);
 					if (!email_match.empty() || !name_match.empty() || !subsystem_match.empty()) {
 						files.insert(maintainer_file_name_from_subsystem(s.name));
 						found = true;
