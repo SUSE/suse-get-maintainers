@@ -704,6 +704,8 @@ namespace {
 						const auto last_col = line.find_last_of(':');
 						if (last_col != std::string::npos) {
 							auto subsys = line.substr(13, last_col - 13);
+							while (subsys.find(",") != std::string::npos)
+								subsys = subsys.replace(subsys.find(","), 1, "");
 							while (subsys.find(": ") != std::string::npos)
 								subsys = subsys.replace(subsys.find(": "), 2, ";");
 							std::cout << subsys;
