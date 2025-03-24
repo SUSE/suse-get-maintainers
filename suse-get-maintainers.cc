@@ -668,7 +668,7 @@ namespace {
 		for (const auto &mf: files) {
 			std::string mf_on_the_disk = fetch_file_if_needed(std::string(), mf, "http://fixes.prg2.suse.org/current/" + mf, trace, false, true);
 			if (csv)
-				std::cout << "commit,subsys-part,bsc,cve,sle-versions\n";
+				std::cout << "commit,subsys-part,sle-versions,bsc,cve\n";
 			else
 				std::cout << "--------------------------------------------------------------------------------\n";
 			if (!mf_on_the_disk.empty()) {
@@ -677,60 +677,71 @@ namespace {
 				std::ifstream file{mf_on_the_disk};
 				if (!file.is_open())
 					fail_with_message("Unable to open file: ", mf_on_the_disk);
-				bool printed_version = false, printed_line = false;
+				enum {
+					commit, subsys, sle_version, bsc, cve, last
+				};
+				std::string csv_details[last];
 				for (std::string line; getline(file, line);) {
 					std::string possible_cve;
+
+					auto line_not_hex_to_csv = [&csv_details, &line]() {
+						std::istringstream line_iss(line);
+						std::string considered, for_, version_;
+						line_iss >> considered >> for_ >> version_;
+						if(considered == "Considered" && for_ == "for") {
+							if (csv_details[sle_version] != "")
+								csv_details[sle_version] += ";";
+							csv_details[sle_version] += version_;
+						} else if (line.length() == 0 && csv_details[commit] != "") {
+							std::cout << csv_details[commit] << ","
+										<< csv_details[subsys] << ","
+										<< csv_details[sle_version] << ","
+										<< csv_details[bsc] << ","
+										<< csv_details[cve]
+										<< '\n';
+							std::fill_n(csv_details, last, "");
+						}
+					};
+
+					auto line_is_hex_to_csv = [&csv_details, &possible_cve, &line, &cve_to_bugzilla]() {
+						const auto last_col = line.rfind(": ");
+						if (last_col != std::string::npos) {
+							csv_details[subsys] = line.substr(13, last_col - 13);
+							const std::string replace_chars = ",;()[]{}";
+							for (size_t loc; (loc = csv_details[subsys].find_first_of(replace_chars)) != std::string::npos;)
+								csv_details[subsys] = csv_details[subsys].replace(loc, 1, "");
+							for (size_t loc; (loc = csv_details[subsys].find(": ")) != std::string::npos;)
+								csv_details[subsys] = csv_details[subsys].replace(loc, 2, ";");
+						}
+
+						if (!possible_cve.empty()) {
+							csv_details[cve] = possible_cve;
+
+							const std::string possible_bsc = cve_to_bugzilla.get_bsc(possible_cve);
+							if (!possible_bsc.empty())
+								csv_details[bsc] = possible_bsc.substr(4);
+						}
+					};
+
 					const auto possible_sha = (line.size() > 13 && line[12] == ' ') ? line.substr(0, 12) : "nope";
 					if (is_hex(possible_sha)) {
 						possible_cve = cve_hash_map.get_cve_douze(possible_sha);
+						csv_details[commit] = possible_sha;
 					} else if (csv) {
-						std::istringstream line_iss(line);
-						std::string considered, for_, version;
-						line_iss >> considered >> for_ >> version;
-						if(considered == "Considered" && for_ == "for") {
-							if (printed_version)
-								std::cout << ";";
-							std::cout << version;
-							printed_version = true;
-						} else if (line.length() == 0 && printed_line) {
-							std::cout << '\n';
-							printed_line = false;
-							printed_version = false;
-						}
+						line_not_hex_to_csv();
 						continue;
 					}
 					if (csv) {
-						std::cout << possible_sha << ",";
-						const auto last_col = line.find_last_of(':');
-						if (last_col != std::string::npos) {
-							auto subsys = line.substr(13, last_col - 13);
-							while (subsys.find(",") != std::string::npos)
-								subsys = subsys.replace(subsys.find(","), 1, "");
-							while (subsys.find(": ") != std::string::npos)
-								subsys = subsys.replace(subsys.find(": "), 2, ";");
-							std::cout << subsys;
-						}
-
-						std::cout << ",";
+						line_is_hex_to_csv();
 					} else {
 						std::cout << line << '\n';
-					}
-					if (!possible_cve.empty()) {
-						if (csv)
-							std::cout << possible_cve << ",";
-						else
+						if (!possible_cve.empty()) {
 							std::cout << "        " << possible_cve;
-						const std::string possible_bsc = cve_to_bugzilla.get_bsc(possible_cve);
-						if (!possible_bsc.empty()) {
-							if (csv)
-								std::cout << possible_bsc.substr(4) << ",";
-							else
+							const std::string possible_bsc = cve_to_bugzilla.get_bsc(possible_cve);
+							if (!possible_bsc.empty())
 								std::cout << " https://bugzilla.suse.com/show_bug.cgi?id=" << possible_bsc.substr(4);
-						} else if (csv)
-							std::cout << ",";
-					} else if (csv)
-						std::cout << ",,";
-					printed_line = true;
+						}
+					}
 				}
 				if (csv)
 					std::cout << "\n";
