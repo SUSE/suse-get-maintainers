@@ -739,7 +739,7 @@ namespace {
 							std::cout << "        " << possible_cve;
 							const std::string possible_bsc = cve_to_bugzilla.get_bsc(possible_cve);
 							if (!possible_bsc.empty())
-								std::cout << " https://bugzilla.suse.com/show_bug.cgi?id=" << possible_bsc.substr(4);
+								std::cout << " https://bugzilla.suse.com/show_bug.cgi?id=" << possible_bsc.substr(4) << '\n';
 						}
 					}
 				}
