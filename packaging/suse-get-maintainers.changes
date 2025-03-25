@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Tue Mar 25 06:45:54 PM CET 2025 - Miroslav Franc <mfranc@suse.cz>
+
+- Update version 1.2.3
+  * --csv option for --fixes by Steffen Jaeckel
+
+-------------------------------------------------------------------
 Mon Mar 17 03:06:01 PM CET 2025 - Miroslav Franc <mfranc@suse.cz>
 
 - Update version 1.2.2
