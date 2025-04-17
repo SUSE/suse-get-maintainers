@@ -365,6 +365,7 @@ namespace {
 			   const std::set<std::string> &shas,
 			   const std::set<std::string> &suse_users,
 			   bool skip_signoffs,
+			   bool trace,
 			   F pp)
 	{
 		for (const std::string &s: shas) {
@@ -387,6 +388,8 @@ namespace {
 			if (!skip_signoffs) {
 				sb = commit.get_somebody_else(suse_users);
 				if (!sb.empty()) {
+					if (trace)
+						emit_message("SHA ", s," contains directly our people: skipping maintainers file (supress this with -M)!");
 					pp(s, sb, paths);
 					continue;
 				}

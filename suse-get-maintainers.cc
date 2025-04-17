@@ -290,7 +290,7 @@ int main(int argc, char **argv)
 		if (gm.json)
 			std::cout << "[\n";
 
-		search_commit(rk, gm.shas, suse_users, gm.only_maintainers,
+		search_commit(rk, gm.shas, suse_users, gm.only_maintainers, gm.trace,
 			      [&maintainers, &upstream_maintainers, &has_cves, &first, &cve_hash_map, simple]
 			      (const std::string &sha, const std::vector<Person> &sb, const std::set<std::string> &paths) {
 			if (gm.trace && !paths.empty()) {
