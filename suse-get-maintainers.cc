@@ -254,21 +254,24 @@ int main(int argc, char **argv)
 		if (gm.cves.size() > 1) {
 			validate_cves(gm.cves);
 			for (const auto &c: gm.cves) {
-				std::string sha = cve_hash_map.get_sha(c);
-				if (gm.trace)
-					std::cerr << "CVE(" << c << ") is SHA(" << sha << ")" << std::endl;
-				if (!sha.empty())
-					gm.shas.insert(sha);
-				else
+				const std::vector<std::string> shas = cve_hash_map.get_shas(c);
+				for (const std::string &s: shas) {
+					gm.shas.insert(s);
+					if (gm.trace)
+						std::cerr << "CVE(" << c << ") is SHA(" << s << ")" << std::endl;
+				}
+				if (shas.empty())
 					std::cerr << "Unable to translate CVE number (" << c << ") to SHA hash" << std::endl;
 			}
 		} else {
-			const std::string sha = cve_hash_map.get_sha(*gm.cves.cbegin());
-			if (sha.empty())
+			const std::vector<std::string> shas = cve_hash_map.get_shas(*gm.cves.cbegin());
+			for (const std::string &s: shas) {
+				gm.shas.insert(s);
+				if (gm.trace)
+					std::cerr << "CVE(" << *gm.cves.cbegin() << ") is SHA(" << s << ")" << std::endl;
+			}
+			if (shas.empty())
 				fail_with_message("Unable to translate CVE number (", *gm.cves.cbegin(), ") to SHA hash");
-			gm.shas.insert(sha);
-			if (gm.trace)
-				std::cerr << "CVE(" << *gm.cves.cbegin() << ") is SHA(" << sha << ")" << std::endl;
 		}
 	}
 

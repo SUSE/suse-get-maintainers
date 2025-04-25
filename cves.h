@@ -3,10 +3,12 @@
 
 #include <unordered_map>
 #include <set>
+#include <vector>
 #include <algorithm>
 #include <string>
 #include <fstream>
 #include <iostream>
+#include <sstream>
 #include "git2.h"
 
 namespace {
@@ -14,12 +16,12 @@ namespace {
 		CVEHashMap(int y, bool r, bool d) : year(y), rejected(r), douze(d) {}
 
 		bool load(const std::string &vsource);
-		std::string get_sha(const std::string &cve_number) const;
+		std::vector<std::string> get_shas(const std::string &cve_number) const;
 		std::string get_cve(const std::string &sha_commit) const;
 		std::string get_cve_douze(const std::string &sha_commit) const;
 		std::set<std::string> get_all_cves() const;
 	private:
-		std::unordered_map<std::string, std::string> m_cve_hash_map;
+		std::unordered_multimap<std::string, std::string> m_cve_hash_multimap;
 		std::unordered_map<std::string, std::string> m_sha_hash_map;
 		std::unordered_map<std::string, std::string> m_douze_hash_map;
 		int year;
@@ -69,12 +71,7 @@ namespace {
 			fail_with_message(error_message, git_error_last()->message);
 
 		const auto regex_cve_number = std::regex("CVE-[0-9][0-9][0-9][0-9]-[0-9]+", std::regex::optimize);
-		for (const auto &[file, sha]: fc.m_contents) {
-			const std::string_view sha_hash = trim(sha);
-			if (!is_hex(sha_hash) || sha_hash.size() != 40) {
-				emit_message('"', sha_hash, "\" doesn't seem to be a commit hash! (from a file \"", file, "\")");
-				continue;
-			}
+		for (const auto &[file, contents]: fc.m_contents) {
 			std::smatch match;
 			std::regex_search(file, match, regex_cve_number);
 			std::string cve_number = match.str();
@@ -82,23 +79,31 @@ namespace {
 				emit_message(cve_number, " doesn't seem to be a cve number!");
 				continue;
 			}
-			if (douze)
-				m_douze_hash_map.insert(std::make_pair(sha_hash.substr(0, 12), std::move(cve_number)));
-			else {
-				m_cve_hash_map.insert(std::make_pair(cve_number, sha_hash));
-				m_sha_hash_map.insert(std::make_pair(std::move(sha_hash), std::move(cve_number)));
+			std::istringstream iss(contents);
+			std::string sha_hash;
+			while (iss >> sha_hash) {
+				if (!is_hex(sha_hash) || sha_hash.size() != 40) {
+					emit_message('"', sha_hash, "\" doesn't seem to be a commit hash! (from a file \"", file, "\")");
+					continue;
+				}
+				if (douze)
+					m_douze_hash_map.insert(std::make_pair(sha_hash.substr(0, 12), cve_number));
+				else {
+					m_cve_hash_multimap.insert(std::make_pair(cve_number, sha_hash));
+					m_sha_hash_map.insert(std::make_pair(std::move(sha_hash), cve_number));
+				}
 			}
 		}
 		return true;
 	}
 
-	std::string CVEHashMap::get_sha(const std::string &cve_number) const
+	std::vector<std::string> CVEHashMap::get_shas(const std::string &cve_number) const
 	{
-		const auto it = m_cve_hash_map.find(cve_number);
-		if (it != m_cve_hash_map.cend())
-			return it->second;
-
-		return std::string();
+		std::vector<std::string> ret;
+		const auto range = m_cve_hash_multimap.equal_range(cve_number);
+		for (auto it = range.first; it != range.second; ++it)
+			ret.push_back(it->second);
+		return ret;
 	}
 
 	std::string CVEHashMap::get_cve(const std::string &sha_commit) const
@@ -122,7 +127,7 @@ namespace {
 	std::set<std::string> CVEHashMap::get_all_cves() const
 	{
 		std::set<std::string> ret;
-		std::transform(m_cve_hash_map.cbegin(), m_cve_hash_map.cend(), std::inserter(ret, ret.end()), [](const auto &p) { return p.first; });
+		std::transform(m_cve_hash_multimap.cbegin(), m_cve_hash_multimap.cend(), std::inserter(ret, ret.end()), [](const auto &p) { return p.first; });
 		return ret;
 	}
 }
