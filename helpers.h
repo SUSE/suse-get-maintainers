@@ -249,7 +249,7 @@ namespace {
 		return ret;
 	}
 
-	int get_soft_limit_for_opened_files(unsigned long min_limit)
+	std::size_t get_soft_limit_for_opened_files(std::size_t min_limit)
 	{
 		struct rlimit rl;
 		if (getrlimit(RLIMIT_NOFILE, &rl) == 0) {
