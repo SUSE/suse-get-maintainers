@@ -94,6 +94,9 @@ int main(int argc, char **argv)
 	// END TODO
 
 	LibGit2 libgit2_state;
+	const unsigned long libgit2_limit_opened_files = get_soft_limit_for_opened_files(20) - 16;
+	if (git_libgit2_opts(GIT_OPT_SET_MWINDOW_FILE_LIMIT, libgit2_limit_opened_files))
+	    emit_message("Could not set a limit for opened files: ", libgit2_limit_opened_files);
 
 	if (gm.init) {
 		if (!gm.kernel_tree.empty()) {

@@ -11,6 +11,7 @@
 #include <regex>
 #include <cstring>
 #include <string_view>
+#include <sys/resource.h>
 
 // TODO
 #include <unordered_map>
@@ -246,6 +247,18 @@ namespace {
 			throw 1;
 		}
 		return ret;
+	}
+
+	int get_soft_limit_for_opened_files(unsigned long min_limit)
+	{
+		struct rlimit rl;
+		if (getrlimit(RLIMIT_NOFILE, &rl) == 0) {
+			if (rl.rlim_cur < min_limit)
+				fail_with_message("RLIMIT_NOFILE is less than ", min_limit, ".  Please bump it!");
+			return rl.rlim_cur;
+		}
+		emit_message("getrlimit");
+		return 1024;
 	}
 
 	// TODO
