@@ -20,7 +20,7 @@ debug: all
 	${CXX} -MM -c $(CXXFLAGS) $< > $@
 
 $(TARGET): $(TARGET).o
-	${CXX} -o $@ $(CXXFLAGS) $+ -lgit2 -lcurl
+	${CXX} -o $@ $(CXXFLAGS) $+ -lgit2 -lcurl -lsqlite3
 
 clean:
 	rm -f $(TARGET) *.o

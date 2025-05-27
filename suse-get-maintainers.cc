@@ -13,6 +13,7 @@
 #include "curl.h"
 #include "maintainers.h"
 #include "cve2bugzilla.h"
+#include "libsqlite3.h"
 // TODO
 #include "temporary.h"
 // END TODO
@@ -46,6 +47,7 @@ namespace {
 		std::string whois;
 		std::string grep;
 		std::string fixes;
+		std::string conf_file_map;
 		std::set<std::string> cves;
 		int year = 0;
 		bool rejected = false;
@@ -92,6 +94,9 @@ int main(int argc, char **argv)
 
 	constexpr const char maintainers_url[] = "https://kerncvs.suse.de/MAINTAINERS";
 	gm.maintainers = fetch_file_if_needed(gm.maintainers, "MAINTAINERS", maintainers_url, gm.trace, gm.refresh, false);
+
+	constexpr const char conf_file_map[] = "https://kerncvs.suse.de/conf_file_map.sqlite";
+	gm.conf_file_map = fetch_file_if_needed(std::string(), "conf_file_map.sqlite", conf_file_map, gm.trace, gm.refresh, false);
 
 	// TODO
 	temporary = fetch_file_if_needed(std::string(), "user-bugzilla-map.txt", "https://kerncvs.suse.de/user-bugzilla-map.txt", gm.trace, gm.refresh, false);
