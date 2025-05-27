@@ -61,6 +61,11 @@ namespace {
 		bool only_maintainers = false;
 		bool colors = false;
 	} gm;
+
+	constexpr std::size_t tracking_fixes_opened_files = 64;
+	constexpr std::size_t min_total_opened_files = 80;
+	constexpr std::size_t libgit2_opened_files_factor = 2;
+	static_assert(min_total_opened_files >= tracking_fixes_opened_files + libgit2_opened_files_factor);
 }
 
 int main(int argc, char **argv)
@@ -94,7 +99,7 @@ int main(int argc, char **argv)
 	// END TODO
 
 	LibGit2 libgit2_state;
-	const std::size_t libgit2_limit_opened_files = get_soft_limit_for_opened_files(20) - 16;
+	const std::size_t libgit2_limit_opened_files = (get_soft_limit_for_opened_files(min_total_opened_files) - tracking_fixes_opened_files) / libgit2_opened_files_factor;
 	if (git_libgit2_opts(GIT_OPT_SET_MWINDOW_FILE_LIMIT, libgit2_limit_opened_files))
 	    emit_message("Could not set a limit for opened files: ", libgit2_limit_opened_files);
 
