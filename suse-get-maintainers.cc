@@ -6,6 +6,7 @@
 #include <iomanip>
 #include <getopt.h>
 #include <unistd.h>
+#include <filesystem>
 
 #include "helpers.h"
 #include "git2.h"
@@ -30,7 +31,8 @@ namespace {
 	bool fixes(const std::vector<Stanza> &, const std::string &, bool, bool, const CVEHashMap &, const CVE2Bugzilla &);
 	std::set<std::string> read_stdin_sans_new_lines();
 	template<typename F>
-	void for_all_stanzas(const std::vector<Stanza> &,
+	void for_all_stanzas(Statement &stmt,
+			     const std::vector<Stanza> &,
 			     const std::vector<Stanza> &,
 			     const std::set<std::string> &,
 			     F pp,
@@ -167,6 +169,15 @@ int main(int argc, char **argv)
 			fetch_repo(gm.kernel_tree, gm.origin);
 	}
 
+	Database db;
+	if (db.from_path(gm.conf_file_map))
+		fail_with_message("Failed to open db: ", gm.conf_file_map);
+
+	Statement stmt;
+	if (stmt.prepare_get_maintainers(db))
+		fail_with_message("Failed to prepare statement: ", get_maintainers);
+
+
 	if (!gm.paths.empty()) {
 		if (gm.from_stdin)
 			gm.paths = read_stdin_sans_new_lines();
@@ -185,12 +196,12 @@ int main(int argc, char **argv)
 					what += color_format(gm.colors, T_BLUE, "\"path\"") + ": " + color_format(gm.colors, T_GREEN, "\"" + p + "\"");
 				} else
 					what = p;
-				for_all_stanzas(maintainers, upstream_maintainers, std::set<std::string>{p}, gm.json ? json_output : csv_output, what);
+				for_all_stanzas(stmt, maintainers, upstream_maintainers, std::set<std::string>{p}, gm.json ? json_output : csv_output, what);
 			}
 			if (gm.json)
 				std::cout << "\n]\n";
 		} else
-			for_all_stanzas(maintainers, upstream_maintainers, gm.paths, show_emails, "");
+			for_all_stanzas(stmt, maintainers, upstream_maintainers, gm.paths, show_emails, "");
 		return 0;
 	}
 
@@ -224,7 +235,7 @@ int main(int argc, char **argv)
 						const std::vector<Person> sb = std::get<std::vector<Person>>(s);
 						show_people(sb, what, false);
 					} else
-						for_all_stanzas(maintainers, upstream_maintainers, std::get<std::set<std::string>>(s), gm.json ? json_output : csv_output, what);
+						for_all_stanzas(stmt, maintainers, upstream_maintainers, std::get<std::set<std::string>>(s), gm.json ? json_output : csv_output, what);
 				} catch (...) { continue; }
 			}
 			if (gm.json)
@@ -240,7 +251,7 @@ int main(int argc, char **argv)
 				const std::vector<Person> sb = std::get<std::vector<Person>>(s);
 				show_people(sb, "", true);
 			} else
-				for_all_stanzas(maintainers, upstream_maintainers, std::get<std::set<std::string>>(s), show_emails, "");
+				for_all_stanzas(stmt, maintainers, upstream_maintainers, std::get<std::set<std::string>>(s), show_emails, "");
 		}
 		return 0;
 	}
@@ -307,7 +318,7 @@ int main(int argc, char **argv)
 			std::cout << "[\n";
 
 		search_commit(rk, gm.shas, suse_users, gm.only_maintainers, gm.trace,
-			      [&maintainers, &upstream_maintainers, &has_cves, &first, &cve_hash_map, simple]
+			      [&maintainers, &upstream_maintainers, &has_cves, &first, &cve_hash_map, &stmt, simple]
 			      (const std::string &sha, const std::vector<Person> &sb, const std::set<std::string> &paths) {
 			if (gm.trace && !paths.empty()) {
 				std::cerr << "SHA " << sha << " contains the following paths: " << std::endl;
@@ -330,7 +341,7 @@ int main(int argc, char **argv)
 			if (!sb.empty()) {
 				show_people(sb, what, simple);
 			} else
-				for_all_stanzas(maintainers, upstream_maintainers, paths, simple ? show_emails : gm.json ? json_output : csv_output, what);
+				for_all_stanzas(stmt, maintainers, upstream_maintainers, paths, simple ? show_emails : gm.json ? json_output : csv_output, what);
 		});
 		if (gm.json)
 			std::cout << "\n]\n";
@@ -546,13 +557,25 @@ namespace {
 		std::cout << what << ',' << "\n    " << color_format(gm.colors, T_BLUE, "\"subsystem\"") << ": " <<
 			color_format(gm.colors, T_GREEN, std::quoted(m.name)) << ",\n    " << color_format(gm.colors, T_BLUE, "\"emails\"") << ": [\n      ";
 		bool first = true;
-		m.for_all_maintainers([&first](const Person &p) {
+		int backport_counts = 0;
+		m.for_all_maintainers([&first, &backport_counts](const Person &p) {
+			backport_counts += p.count;
 			if (!first)
 				std::cout << ",\n      ";
 			first = false;
 			const std::string who = gm.names && !p.name.empty() ? p.name + " <" + p.email + ">" : p.email;
 			std::cout << color_format(gm.colors, T_GREEN, std::quoted(who));
 		});
+		if (backport_counts > 0) {
+			std::cout << "\n    ],\n    " << color_format(gm.colors, T_BLUE, "\"counts\"") << ": [\n      ";
+			first = true;
+			m.for_all_maintainers([&first](const Person &p) {
+				if (!first)
+					std::cout << ",\n      ";
+				first = false;
+				std::cout << color_format(gm.colors, T_GREEN, p.count);
+			});
+		}
 		std::cout << "\n    ]\n  }";
 	}
 
@@ -576,7 +599,9 @@ namespace {
 		} else if (gm.json) {
 			std::cout << what << ',' << "\n    " << color_format(gm.colors, T_BLUE, "\"roles\"") << ": [\n      ";
 			bool first = true;
+			int backport_counts = 0;
 			for (const Person &p: sb) {
+				backport_counts += p.count;
 				if (!first)
 					std::cout << ",\n      ";
 				first = false;
@@ -591,6 +616,16 @@ namespace {
 				const std::string tmp_email = translate_email(p.email); // TODO
 				const std::string who = gm.names && !p.name.empty() ? p.name + " <" + tmp_email + ">" : tmp_email;
 				std::cout << color_format(gm.colors, T_GREEN, std::quoted(who));
+			}
+			if (backport_counts > 0) {
+				std::cout << "\n    ],\n    " << color_format(gm.colors, T_BLUE, "\"counts\"") << ": [\n      ";
+				first = true;
+				for (const Person &p: sb) {
+					if (!first)
+						std::cout << ",\n      ";
+					first = false;
+					std::cout << color_format(gm.colors, T_GREEN, p.count);
+				}
 			}
 			std::cout << "\n    ]\n  }";
 		} else {
@@ -794,7 +829,8 @@ namespace {
 	}
 
 	template<typename F>
-	void for_all_stanzas(const std::vector<Stanza> &suse_stanzas,
+	void for_all_stanzas(Statement &stmt,
+			     const std::vector<Stanza> &suse_stanzas,
 			     const std::vector<Stanza> &upstream_stanzas,
 			     const std::set<std::string> &paths,
 			     F pp,
@@ -816,6 +852,42 @@ namespace {
 				std::cerr << "Upstream STANZA: " << stanza.value()->name << std::endl;
 			pp(*stanza.value(), what);
 			return;
+		}
+
+		if (!gm.conf_file_map.empty()) {
+			std::vector<GetMaintainers> out;
+			for (const std::string &p: paths) {
+				const std::filesystem::path path(p);
+				const std::string dir = path.parent_path(), file = path.filename();
+
+				if (stmt.bind_get_maitainers(file, dir, 4))
+					fail_with_message("Failed to bind parameters: ", file, dir, 4);
+
+				if (stmt.step_get_maitainers(out))
+					fail_with_message("Failed to query.");
+			}
+			if (!out.empty()) {
+				std::unordered_map<std::string, int> emails_and_counts_m;
+				for (const auto &e: out) {
+					auto result = emails_and_counts_m.insert({e.email, e.count});
+					if (!result.second)
+						result.first->second += e.count;
+				}
+				std::vector<GetMaintainers> emails_and_counts_v;
+				for (const auto &e: emails_and_counts_m)
+					emails_and_counts_v.push_back(GetMaintainers(e.first, e.second));
+				std::sort(emails_and_counts_v.begin(), emails_and_counts_v.end(), [](const GetMaintainers &a, const GetMaintainers &b) {
+					return a.count > b.count;
+				});
+				Stanza s;
+				s.name = "Backporter";
+				for (const auto &e: emails_and_counts_v)
+					s.add_backporter("M: Backporter <" + e.email + ">", e.count);
+				if (gm.trace)
+					std::cerr << "Backporters:" << std::endl;
+				pp(s, what);
+				return;
+			}
 		}
 
 		thread_local auto catch_all_maintainer = Stanza{"Base", "F: Kernel Developers at SuSE <kernel@suse.de>"};

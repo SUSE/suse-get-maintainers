@@ -40,7 +40,9 @@ file for the files touched by the commit/patch.
 If the potential maintainers are found neither in commit/patch nor in
 the suse MAINTAINERS file, the upstream MAINTAINERS file is searched,
 provided the path to the upstream repo is known (via \-k or
-$LINUX_GIT).
+$LINUX_GIT).  If that doesn't work either, as a last resort,
+suse\-get\-maintainers will report backporters, i.e. the people who
+backported some patches to the same files.
 
 In the CSV and JSON reports the role or the subsystem are clearly stated.
 

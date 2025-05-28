@@ -134,11 +134,12 @@ namespace {
 
 	struct Person
 	{
-		Person() : role(Role::Maintainer) {}
-		Person(Role r) : role(r) {}
+		Person() : role(Role::Maintainer), count(0) {}
+		Person(Role r) : role(r), count(0) {}
 		std::string name;
 		std::string email;
 		Role role;
+		int count;
 		bool parse(const std::string &s)
 			{
 				for (std::size_t i = 1; i < index(Role::TestedBy); ++i) {

@@ -90,6 +90,18 @@ namespace {
 				} else
 					emit_message("MAINTAINERS: contact ", maintainer, " cannot be parsed into name and email!");
 			}
+		void add_backporter(const std::string_view maintainer, int cnt)
+			{
+				Person m{Role::Maintainer};
+				m.count = cnt;
+				if (parse_person(maintainer, m.name, m.email)) {
+					// TODO
+					m.email = translate_email(m.email);
+					// END TODO
+					m_maintainers.push_back(std::move(m));
+				} else
+					emit_message("MAINTAINERS: contact ", maintainer, " cannot be parsed into name and email!");
+			}
 		void add_maintainer_if(const std::string_view maintainer, const std::set<std::string> &suse_users)
 			{
 				Person m{Role::Upstream};

@@ -31,7 +31,7 @@ namespace {
 		sqlite3 *database;
 	};
 
-	constexpr char get_maintainers[] = "SELECT user.email, sum(map.count_no_fixes) AS cnt " \
+	constexpr char get_maintainers[] = "SELECT user.email, sum(map.count) AS cnt " \
 		"FROM user_file_map AS map " \
 		"LEFT JOIN user ON map.user = user.id " \
 		"WHERE map.file = (SELECT id FROM file WHERE file = ? " \
