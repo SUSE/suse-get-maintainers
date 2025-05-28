@@ -89,8 +89,8 @@ namespace {
 
 	bool is_suse_address(const std::set<std::string> &users, const std::string &email)
 	{
-		return (email.ends_with("@suse.com") || email.ends_with("@suse.cz") || email.ends_with("@suse.de"))
-			&& users.contains(email.substr(0, email.find_first_of("@")));
+		return (email.ends_with("@suse.com") || email.ends_with("@suse.cz") || email.ends_with("@suse.de"));
+		//&& users.contains(email.substr(0, email.find_first_of("@")));
 	}
 
 	bool parse_person(const std::string_view src, std::string &out_name, std::string &out_email)
