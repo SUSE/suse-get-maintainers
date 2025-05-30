@@ -1,4 +1,16 @@
 -------------------------------------------------------------------
+Fri May 30 06:30:14 PM CEST 2025 - Miroslav Franc <mfranc@suse.cz>
+
+- Update version 1.4.4
+  * add missing sqlite3-devel builddep
+
+-------------------------------------------------------------------
+Fri May 30 06:26:37 PM CEST 2025 - Miroslav Franc <mfranc@suse.cz>
+
+- Update version 1.4.3
+  * add missing libsqlite3 dependency
+
+-------------------------------------------------------------------
 Fri May 30 06:01:36 PM CEST 2025 - Miroslav Franc <mfranc@suse.cz>
 
 - Update version 1.4.1

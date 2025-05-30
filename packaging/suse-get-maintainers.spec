@@ -1,5 +1,5 @@
 Name:           suse-get-maintainers
-Version:        1.4.1
+Version:        1.4.4
 Release:        0
 Summary:        A tool to identify SUSE maintainers responsible for particular kernel code
 License:        GPL-3.0-or-later
@@ -8,6 +8,7 @@ URL:            https://gitlab.suse.de/mfranc/tracking-fixes
 Source:         %{name}-%{version}.tar.xz
 BuildRequires:  libgit2-devel
 BuildRequires:  libcurl-devel
+BuildRequires:  sqlite3-devel
 %if 0%{?sle_version} > 0
 BuildRequires:  gcc13-c++
 %else
