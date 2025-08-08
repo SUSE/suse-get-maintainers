@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Fri Aug  8 02:05:29 PM CEST 2025 - Miroslav Franc <mfranc@suse.cz>
+
+- Update version 1.4.5
+  * fetching sqlite db after a week and not 12 hours
+
+-------------------------------------------------------------------
 Fri May 30 06:30:14 PM CEST 2025 - Miroslav Franc <mfranc@suse.cz>
 
 - Update version 1.4.4
