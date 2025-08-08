@@ -49,7 +49,7 @@ namespace
 		FILE* m_pagefile;
 	};
 
-	std::string fetch_file_if_needed(std::string maintainers_path, const std::string &name, const std::string &url, bool trace, bool refresh, bool ignore_errors)
+	std::string fetch_file_if_needed(std::string maintainers_path, const std::string &name, const std::string &url, bool trace, bool refresh, bool ignore_errors, int hours)
 	{
 		if (!maintainers_path.empty())
 			return maintainers_path;
@@ -84,7 +84,7 @@ namespace
 				struct timespec current_time;
 				timespec_get(&current_time, TIME_UTC);
 
-				constexpr decltype(current_time.tv_sec) expires_after_seconds = 60 * 60 * 12;
+				const decltype(current_time.tv_sec) expires_after_seconds = 60 * 60 * hours;
 				decltype(current_time.tv_sec) time_diff = current_time.tv_sec - sb.st_mtim.tv_sec;
 				if (time_diff < expires_after_seconds)
 					return maintainers_path;
