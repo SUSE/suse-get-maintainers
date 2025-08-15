@@ -37,6 +37,23 @@ further at the MAINTAINERS file and reports that person or people as a
 maintainer or maintainers regardless of what is in the MAINTAINERS
 file for the files touched by the commit/patch.
 
+Lookup in our MAINTAINERS file is done by collecting all the paths
+from a patch or a commit, matching each of them against a pattern in
+the MAINTAINERS file itself and assigning score to each path based on
+the number of components in the pattern that matched it.  The
+subsystem scores (for a patch or a commit) are calculated by summing
+all the scores for paths that match patterns for one subsystem in our
+MAINTAINERS file.  The subsystem with the biggest score wins.  In case
+the score is the same, the subsystem earlier in the MAINTAINERS file
+take precedence.
+
+For example, the patch contains 3 paths.  x/y/foo.c, x/y/bar.c and
+i/j/baz.c.  The first two match against x/y/ pattern from the
+subsystem A and the third matches i/j/*.c pattern from the subsystem
+B.  The scores are 2 (x and y), 2 (x and y) and 3 (i, j and *.c).  The
+subsystem scores are 4 (2 + 2) for the subsystem A and 3 for the
+subsystem B.  So, the patch belongs to the subsystem A.
+
 If the potential maintainers are found neither in commit/patch nor in
 the suse MAINTAINERS file, the upstream MAINTAINERS file is searched,
 provided the path to the upstream repo is known (via \-k or
