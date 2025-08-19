@@ -63,6 +63,7 @@ namespace {
 		bool init = false;
 		bool no_translation = false;
 		bool only_maintainers = false;
+		bool no_db = false;
 		bool colors = false;
 	} gm;
 
@@ -98,7 +99,8 @@ int main(int argc, char **argv)
 	gm.maintainers = fetch_file_if_needed(gm.maintainers, "MAINTAINERS", maintainers_url, gm.trace, gm.refresh, false, 12);
 
 	constexpr const char conf_file_map[] = "https://kerncvs.suse.de/conf_file_map.sqlite";
-	gm.conf_file_map = fetch_file_if_needed(std::string(), "conf_file_map.sqlite", conf_file_map, gm.trace, gm.refresh, false, 24 * 7);
+	if (!gm.no_db)
+		gm.conf_file_map = fetch_file_if_needed(std::string(), "conf_file_map.sqlite", conf_file_map, gm.trace, gm.refresh, false, 24 * 7);
 
 	// TODO
 	temporary = fetch_file_if_needed(std::string(), "user-bugzilla-map.txt", "https://kerncvs.suse.de/user-bugzilla-map.txt", gm.trace, gm.refresh, false, 12);
@@ -170,12 +172,14 @@ int main(int argc, char **argv)
 	}
 
 	Database db;
-	if (db.from_path(gm.conf_file_map))
-		fail_with_message("Failed to open db: ", gm.conf_file_map);
+	if (!gm.no_db)
+		if (db.from_path(gm.conf_file_map))
+			fail_with_message("Failed to open db: ", gm.conf_file_map);
 
 	Statement stmt;
-	if (stmt.prepare_get_maintainers(db))
-		fail_with_message("Failed to prepare statement: ", get_maintainers);
+	if (!gm.no_db)
+		if (stmt.prepare_get_maintainers(db))
+			fail_with_message("Failed to prepare statement: ", get_maintainers);
 
 
 	if (!gm.paths.empty()) {
@@ -384,6 +388,7 @@ namespace {
 		os << "  --names, -n                   - Include full names with the emails; by default, just emails are extracted\n";
 		os << "  --no_translation, -N          - Do not translate to bugzilla emails\n";
 		os << "  --only_maintainers, -M        - Do not analyze the patches/commits; only MAINTAINERS files\n";
+		os << "  --no_db, -D                   - Do not fetch/process conf_file_map.sqlite db and therefore do not report backporters\n";
 		os << "  --trace, -t                   - Be a bit more verbose about how we got there on STDERR\n";
 		os << "  --version, -V                 - Print just the version number\n";
 	}
@@ -413,6 +418,7 @@ namespace {
 		{ "trace", no_argument, nullptr, 't' },
 		{ "no_translation", no_argument, nullptr, 'N' },
 		{ "only_maintainers", no_argument, nullptr, 'M' },
+		{ "no_db", no_argument, nullptr, 'D' },
 		{ "version", no_argument, nullptr, 'V' },
 		{ nullptr, 0, nullptr, 0 },
 	};
@@ -425,7 +431,7 @@ namespace {
 		for (;;) {
 			int opt_idx;
 
-			c = getopt_long(argc, argv, "hm:k:o:s:p:d:v:c:w:g:f:CRy:rijSantNMV", opts, &opt_idx);
+			c = getopt_long(argc, argv, "hm:k:o:s:p:d:v:c:w:g:f:CRy:rijSantNMDV", opts, &opt_idx);
 			if (c == -1)
 				break;
 
@@ -519,6 +525,9 @@ namespace {
 				break;
 			case 'M':
 				gm.only_maintainers = true;
+				break;
+			case 'D':
+				gm.no_db = true;
 				break;
 			case 'V':
 				std::cout << SUSE_GET_MAINTAINERS_VERSION << '\n';
@@ -854,7 +863,7 @@ namespace {
 			return;
 		}
 
-		if (!gm.conf_file_map.empty()) {
+		if (stmt) {
 			std::vector<GetMaintainers> out;
 			for (const std::string &p: paths) {
 				const std::filesystem::path path(p);

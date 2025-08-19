@@ -28,6 +28,8 @@ namespace {
 
 		int from_path(const std::string &db_path) { return sqlite3_open(db_path.c_str(), &database); }
 
+		operator bool() const { return database != nullptr; }
+
 		sqlite3 *database;
 	};
 
@@ -110,6 +112,8 @@ namespace {
 			}
 			return rc;
 		}
+
+		operator bool() const { return statement != nullptr; }
 
 		sqlite3_stmt *statement;
 	};
