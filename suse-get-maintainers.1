@@ -1,0 +1,272 @@
+.TH SUSE\-GET\-MAINTAINTERS 1
+
+.SH NAME
+suse\-get\-maintainers \- who is reposponsible for what within SUSE kernel
+
+.SH SYNOPSIS
+n.B suse\-get\-maintainers
+[\fB\-p PATH|\-d FILE|\-s HASH|\-c CVE_NUMBER|\-C|\-y YEAR\fR] [\fBOTHER OPTIONS\fR]
+
+.SH DESCRIPTION
+
+.B suse\-get\-maintainers
+utility takes either a kernel path, an upstream commmit hash, a
+unified patch produced by git or a CVE number and produces contacts
+for SUSE maintainers responsible for the relevant code. It can also
+work in a batch mode where the input is provided on the standard input
+one item per line and the results are presented in CSV or JSON
+formats on stdout.  One can also ask for all kernel CVEs.  For
+advanced functionality (upstream hashs, CVE numbers) it requires
+access to a git kernel tree and git kernel vulnerability database.
+
+It's important to realize that if a git commit or a patch has one of
+the following:
+
+.RS
+            Author/From
+            Signed\-off\-by
+            Co\-developed\-by
+            Suggested\-by
+            Reviewed\-by
+            Acked\-by
+            Tested\-by
+            Reported\-by
+.RE
+
+And the address seems to be a kernel maintainer from SUSE.
+suse\-get\-maintainers is not even looking further and reports that
+person as a maintainer regardless of what is in the MAINTAINERS file
+for the files touched by the commit/patch.
+
+In the CSV and JSON reports the role or the subsystem are clearly stated.
+
+.SH OPTIONS
+
+.TP
+.BR \-h ", " \-\-help
+Print this help message
+
+.TP
+.BR \-m ", " \-\-maintainers =\fIFILE\fR
+Custom path to the MAINTAINERS file instead of
+$XDG_CONFIG_HOME/suse\-get\-maintainers/MAINTAINERS or
+$HOME/.cache/suse\-get\-maintainers/MAINTAINERS.
+
+.TP
+.BR \-k ", " \-\-kernel_tree =\fIDIRECTORY\fR
+Directory containing a clone of the mainline kernel repo.  The value
+is by default taken from $LINUX_GIT.  You can keep it up to date with
+\-\-refresh or \-r option.
+
+.TP
+.BR \-v ", " \-\-vulns =\fIDIRECTORY\fR
+Directory containing a clone of the kernel vulnerability database:
+https://git.kernel.org/pub/scm/linux/security/vulns.git.  The value is
+by default taken from $VULNS_GIT.  You can keep it up to date with
+\-\-refresh or \-r option.
+
+.TP
+.BR \-s ", " \-\-sha =[\fIHASH\fR|\fI\-\fR]...
+SHA hash of a commit we want to find maintainers for.  If you want to
+query more than one hash, it's recommended to use batch mode with \-
+as an argument in which case hashes are read one per line from STDIN.
+Alternatively, you can provide this option multiple times with
+different values.  The hashes must be at least 12 characters long.
+The batch mode also implies output in CSV format for easy processing,
+but you can request JSON fromat with \-j option.
+
+.TP
+.BR \-p ", " \-\-path =[\fIPATH\fR|\fI\-\fR]...
+Path for which we want to find maintainers. \- as an argument implies
+batch mode in which case paths are read one per line from
+STDIN.  Alternatively, you can provide this option multiple times with
+different values.  The batch mode also implies output in CSV format
+for easy processing, but you can request JSON fromat with \-j option.
+
+.TP
+.BR \-d ", " \-\-diff =[\fIFILE\fR|\fI\-\fR]...
+Path to a patch (diff) for which we want to find maintainers. \- as an
+argument implies batch mode in which case patch (diff) files are read
+one per line from STDIN.  Alternatively, you can provide this option
+multiple times with different values.  The batch mode also implies output 
+in CSV format for easy processing, but you can request JSON fromat with \-j
+option.
+
+.TP
+.BR \-c ", " \-\-cve =[\fICVE_NUMBER\fR|\fI\-\fR]...
+CVE number we want to find maintainers for.  If you want to query more
+than one CVE number, it's recommended to use batch mode with \- as an
+argument in which case CVE numbers are read one per line from
+STDIN.  Each CVE number is translated to mainline SHA hash
+transparently.  Alternatively, you can provide this option multiple times 
+with different value.  The batch mode also implies output in CSV format for
+easy processing, but you can request JSON fromat with \-j option.
+
+.TP
+.BR \-R ", " \-\-rejected
+Query rejected CVE numbers instead of the published ones.  To be used
+with \-c, \-C and \-y.
+
+.TP
+.BR \-y ", " \-\-year =[\fIYEAR\fR]
+CVE number from a given YEAR we want to find maintainers for.  Each
+CVE number is translated to mainline SHA hash transparently.  Implies
+output in CSV format for easy processing, but you can request JSON
+fromat with \-j option.
+
+.TP
+.BR \-r ", " \-\-refresh
+Fetches MAINTAINERS file unconditionally, updates (fetches origin in)
+kernel vulnerability database repo (\-v or $VULNS_GIT) and upstream
+kernel repo (\-k or $LINUX_GIT) if present.  MAINTAINERS file is
+normally cached only for 12 hours in
+$XDG_CONFIG_HOME/suse\-get\-maintainers/MAINTAINERS or
+$HOME/.cache/suse\-get\-maintainers/MAINTAINERS.  And you can, of
+course, run \fBgit fetch\fR within git repos manually.  On top of
+that, suse\-get\-maintainers doesn't care about the state of the
+working tree or tracking branches, that's why it does only fetching.
+If some other tool does care about tracking branches and the state of
+the working tree, it's better to run \fBgit pull\fR (fetch + merge)
+manually or run just \fBgit merge\fR after running this.  This option
+is for convenience only.
+
+.TP
+.BR \-i ", " \-\-init
+To be used with \-\-kernel_tree (\-k) and/or \-\-vulns (\-v) options.
+Initializes (clones) the repositories into their respective
+directories.  This options is provided for convenience only.
+
+.TP
+.BR \-j ", " \-\-json
+Output JSON instead of CSV in batch mode.  This option has no effect
+for a single item.  This might change in the future.
+
+.TP
+.BR \-n ", " \-\-names
+Output full names along with emails ("Jane Doe <jane.doe@suse.cz>").
+By default only emails are printed ("jane.doe@suse.cz").  This might
+change in the future.
+
+.TP
+.BR \-t ", " \-\-trace
+This essentially a debugging option where extra steps are printed on
+STDERR.  If you are not sure what the program is doing, this is the
+option to use.
+
+.TP
+.BR \-V ", " \-\-version
+Print just the version number and exit.
+
+.SH EXAMPLES
+
+Who maintains s390x architecture in kernel (full names, not just emails)?
+
+.RS
+$ suse\-get\-maintainers \-p arch/s390 \-n
+.RE
+
+Who maintains power, arm64 and riscv in JSON?
+
+.RS
+$ suse\-get\-maintainers \-p arch/powerpc \-p arch/riscv \-p arch/arm64 \-j
+.RE
+
+I have a patch for kernel, who might be responsible?  Give me emails.
+
+.RS
+$ suse\-get\-maintainers \-d patches.suse/thisweirdkernelthing.patch
+.RE
+
+I have an upstream SHA hash for the kernel, who might be responsible?
+
+.RS
+$ suse\-get\-maintainers \-n \-s c3116e62ddeff79cae342147753ce596f01fcf06
+.RE
+
+I can use shortened log \-\-oneline of Fixes tag form of at least 12 characters.
+
+.RS
+$ suse\-get\-maintainers \-n \-s c3116e62ddef
+.RE
+
+I have 3 hashes, who might be responsible for each?  CSV is good
+enough for me.  Just emails, I'll process it with cut, grep, awk,
+sed...
+
+.RS
+$ echo c3116e62ddeff79cae342147753ce596f01fcf06 > /tmp/l
+.RS
+.RE
+$ echo 826f328e2b7e8854dd42ea44e6519cd75018e7b1 >> /tmp/l
+.RS
+.RE
+$ echo f512e08fd0940fcd811d24e2cfd95683fe8042c3 >> /tmp/l
+.RS
+.RE
+$ cat /tmp/l | suse\-get\-maintainers \-s \-
+.RE
+
+Alternatively, one can provide options multiple times.  The command
+below is equivalent to that above.  Please note, that you can easily
+hit ARG_MAX limit with thousands of options.  The limit for batch mode
+is effectively a computer memory.
+
+.RS
+$ suse\-get\-maintainers \-s c3116e62ddeff79cae342147753ce596f01fcf06 \-s 826f328e2b7e8854dd42ea44e6519cd75018e7b1 \-s f512e08fd0940fcd811d24e2cfd95683fe8042c3
+.RE
+
+Who might be reponsible for the the 2 CVEs in JSON format?
+
+.RS
+$ echo \-e "CVE\-2023\-52620\\nCVE\-2024\-26627" | suse\-get\-maintainers \-\-cve \- \-\-json \-\-names
+.RE
+
+Dump all kernel CVEs in CSV format.
+
+.RS
+$ suse\-get\-maintainers \-\-all_cves
+.RE
+
+Dump all kernel CVEs in JSON format.
+
+.RS
+$ suse\-get\-maintainers \-\-all_cves \-\-json
+.RE
+
+The same as above.
+
+.RS
+$ suse\-get\-maintainers \-Cj
+.RE
+
+My CVEs from 2024.
+
+.RS
+$ suse\-get\-maintainers \-y 2024 | grep mfranc
+.RE
+
+Clone upstream kernel into \[ti]/linux and vulnerability db into \[ti]/vulns.
+
+.RS
+$ suse\-get\-maintainers \-\-init \-\-kernel_tree \[ti]/linux \-\-vulns \[ti]/vulns
+.RE
+
+Clone only vulnerability db into /tmp/vulns.
+
+.RS
+$ suse\-get\-maintainers \-iv /tmp/vulns
+.RE
+
+.SH TODO
+Fetch supported branches automatically and search SUSE patches in them
+for potential maintainers.  Parse upstream MAINTAINERS file.  Fetch a
+mapping from usernames to LDAP usernames and ask LDAP with curl for a
+bugzilla email.
+
+.SH AUTHORS
+
+.RE
+Miroslav Franc <mfranc@suse.cz> \- the utility itself
+.RE
+Joerg Roedel \- parsing MAINTAINERS file (inherited from git\-fixes utility)
+

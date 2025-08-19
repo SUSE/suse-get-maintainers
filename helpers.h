@@ -1,0 +1,200 @@
+#ifndef SGM_HELPERS_H
+#define SGM_HELPERS_H
+
+#include <iostream>
+#include <algorithm>
+#include <variant>
+#include <fstream>
+#include <cstdlib>
+#include <cstddef>
+#include <set>
+#include <regex>
+
+#define SGM_BEGIN try {
+#define SGM_END } catch (int ret) { return ret; } catch (...) { return 42; }
+
+namespace {
+	template<typename... Args> void fail_with_message(Args&&... args)
+	{
+		(std::cerr << ... << args) << std::endl;
+		throw 1;
+	}
+
+	template<typename... Args> void emit_message(Args&&... args)
+	{
+		(std::cerr << ... << args) << std::endl;
+	}
+
+	bool is_hex(const std::string &s)
+	{
+		return std::all_of(s.cbegin(), s.cend(), ::isxdigit);
+	}
+
+	std::string trim(const std::string &line)
+	{
+		static constexpr const char *spaces = " \n\t\r";
+		const auto pos1 = line.find_first_not_of(spaces);
+		const auto pos2 = line.find_last_not_of(spaces);
+
+		if (pos1 == std::string::npos)
+			return std::string("");
+
+		return line.substr(pos1, pos2-pos1+1);
+	}
+
+	const std::string sign_offs[] = {
+		"Author",
+		"Signed-off-by",
+		"Co-developed-by",
+		"Suggested-by",
+		"Reviewed-by",
+		"Acked-by",
+		"Tested-by",
+		"Reported-by",
+		"Maintainer",
+		"Upstream"
+	};
+
+	enum struct Role
+	{
+		Author,
+		SignedOffBy,
+		CoDevelopedBy,
+		SuggestedBy,
+		ReviewedBy,
+		AckedBy,
+		TestedBy,
+		ReportedBy,
+		Maintainer,
+		Upstream
+	};
+
+	std::size_t index(Role r) { return static_cast<std::size_t>(r); }
+
+	std::string to_string(Role r) { return sign_offs[index(r)]; }
+
+	bool is_suse_address(const std::set<std::string> &users, const std::string &email)
+	{
+		return (email.ends_with("@suse.com") || email.ends_with("@suse.cz") || email.ends_with("@suse.de"))
+			&& users.contains(email.substr(0, email.find_first_of("@")));
+	}
+
+	bool parse_person(const std::string &src, std::string &out_name, std::string &out_email)
+	{
+		std::string name, email;
+		auto pos = src.find_last_of("@");
+		if (pos == std::string::npos)
+			return false;
+		auto e_sign = src.find_first_of(":");
+		if (e_sign == std::string::npos)
+			return false;
+		++e_sign;
+		auto b_mail = src.find_first_of("<", e_sign);
+		if (b_mail == std::string::npos)
+			if (src.find_first_of(">", e_sign) != std::string::npos)
+				return false;
+			else {
+				email = trim(src.substr(e_sign));
+				if (email.find_first_of(" \n\t\r") != std::string::npos)
+					return false;
+				else {
+					out_email = email;
+					return true;
+				}
+			}
+		if (b_mail > pos)
+			return false;
+		name = trim(src.substr(e_sign, b_mail - e_sign));
+		if (name.empty())
+			return false;
+		auto e_mail = src.find_first_of(">", b_mail);
+		if (e_mail ==  std::string::npos || e_mail < pos)
+			return false;
+		email = src.substr(b_mail + 1, e_mail - b_mail - 1);
+		if (email.empty())
+			return false;
+		out_name = name;
+		out_email = email;
+		return true;
+	}
+
+	struct Person
+	{
+		Person() : role(Role::Maintainer) {}
+		Person(Role r) : role(r) {}
+		std::string name;
+		std::string email;
+		Role role;
+		bool parse(const std::string &s)
+			{
+				for (std::size_t i = 1; i < index(Role::Maintainer); ++i) {
+					Role r = static_cast<Role>(i);
+					if (s.starts_with(to_string(r))) {
+						role = r;
+						if(parse_person(s, name, email))
+							return true;
+					}
+				}
+				return false;
+			}
+	};
+
+	void validate_cves(const std::set<std::string> &s)
+	{
+		thread_local const auto regex_cve_number = std::regex("CVE-[0-9][0-9][0-9][0-9]-[0-9]+", std::regex::optimize);
+		for (const auto &str: s)
+			if (!std::regex_match(str, regex_cve_number))
+				emit_message(str, " does not seem to be a valid CVE number");
+	}
+
+	std::variant<std::set<std::string>, Person> get_paths_from_patch(const std::string &path, const std::set<std::string>& users)
+	{
+		std::variant<std::set<std::string>, Person> ret;
+		std::string path_to_patch;
+
+		if (!path.empty() && path[0] != '/') {
+			const char *pwd = std::getenv("PWD");
+			if (pwd)
+				path_to_patch = std::string(pwd) + "/" + path;
+		} else
+			path_to_patch = path;
+
+		std::ifstream file(path_to_patch);
+		if (!file.is_open())
+			fail_with_message("Unable to open diff file: ", path_to_patch);
+
+		thread_local const auto regex_add = std::regex("^\\+\\+\\+ [ab]/(.+)", std::regex::optimize);
+		thread_local const auto regex_rem = std::regex("^--- [ab]/(.+)", std::regex::optimize);
+
+		std::set<std::string> paths;
+		bool signoffs = true;
+		std::smatch match;
+		for (std::string line; std::getline(file, line); ) {
+			if (signoffs) {
+				if (line.starts_with("From")) {
+					Person a{Role::Author};
+					if (parse_person(line, a.name, a.email) && is_suse_address(users, a.email)) {
+						ret = std::move(a);
+						return ret;
+					}
+				}
+				Person p;
+				if (p.parse(line) && is_suse_address(users, p.email)) {
+					ret = std::move(p);
+					return ret;
+				}
+				if (line.starts_with("---"))
+				    signoffs = false;
+			}
+
+			if (std::regex_search(line, match, regex_add))
+				paths.insert(match.str(1));
+			else if (std::regex_search(line, match, regex_rem))
+				paths.insert(match.str(1));
+		}
+		ret = std::move(paths);
+		return ret;
+	}
+}
+
+#endif

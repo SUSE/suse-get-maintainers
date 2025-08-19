@@ -1,0 +1,6 @@
+compile_commands.json
+suse-get-maintainers
+*~
+*.swp
+*.o
+*.d

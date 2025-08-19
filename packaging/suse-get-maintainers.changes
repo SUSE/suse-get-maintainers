@@ -1,0 +1,75 @@
+-------------------------------------------------------------------
+Tue Apr 30 12:34:02 AM CEST 2024 - Miroslav Franc <mfranc@suse.cz>
+
+- Update version 1.0.1
+  * enable and require x86-64-v2 for x86-64
+  * implement --rejected (-R) for querying rejected CVEs
+  * --refresh (-r) now fetches origin in $LINUX_GIT as well
+  * implement clone in git2.h
+  * implement --init (-i) option for initial cloning of git repos
+  * update man page
+
+-------------------------------------------------------------------
+Tue Apr 16 02:39:10 PM CEST 2024 - Miroslav Franc <mfranc@suse.cz>
+
+- Update version 1.0.0
+  * fix libgit2 dependency
+
+-------------------------------------------------------------------
+Mon Apr 15 12:25:09 AM CEST 2024 - Miroslav Franc <mfranc@suse.cz>
+
+- Update version 0.9.9
+  * workaround the build failure on SLE15-SP5 and SLE15-SP4
+  * older systems are still broken because of older libgit2
+
+-------------------------------------------------------------------
+Sun Apr 14 02:44:05 AM CEST 2024 - Miroslav Franc <mfranc@suse.cz>
+
+- Update version 0.9.8
+  * allow SHA hashes in shortened forms (from 12 characters) (-s)
+  * update the manpage (man suse-get-maintainers)
+  * implement --all_cves (-C) for dumping all of them
+  * implement --year YEAR (-y) for dumping CVEs from a given year
+  * for patches and git commits report SUSE authors, signoffs etc.
+  * implement --refresh (-r) for fetching VULNS git and MAINTAINERS
+  * try to fix build on SLE12-SP5 (std::string & constexpr)
+  * nuke git-fixes libgit2 wrapper and other vestiges
+  * make curl fetching more generic (in a separate header)
+  * call destructors of local object even in case of failure
+  * skip broken files in batch --diff mode
+
+-------------------------------------------------------------------
+Wed Apr 10 01:23:19 AM CEST 2024 - Miroslav Franc <mfranc@suse.cz>
+
+- Update version 0.9.7
+  * allow -p, -d, -s and -c options mutiple times
+  * fix -d and -p broken in the previous update
+  * update man page and help
+
+-------------------------------------------------------------------
+Tue Apr  9 10:39:53 PM CEST 2024 - Miroslav Franc <mfranc@suse.cz>
+
+- Update version 0.9.6
+  * make -c or --cve and -s or --sha significantly faster
+  * remove -b or --branch option and resolve hashes directly
+
+-------------------------------------------------------------------
+Wed Apr  3 11:46:31 AM CEST 2024 - Miroslav Franc <mfranc@suse.cz>
+
+- Update to version 0.9.5
+  * add version information into the help and --version, -V options
+  * add suse-get-maintainers manpage
+
+-------------------------------------------------------------------
+Tue Apr  2 02:02:11 PM CEST 2024 - Miroslav Franc <mfranc@suse.cz>
+
+- Update to version 0.9.4
+  * repackage suse-get-maintainers
+  * build against gcc13 if available
+  * bump to C++20
+  * prepare for split from git-fixes
+  * don't package needless stuff
+  * add debuginfo
+  * enable position independent code
+
+-------------------------------------------------------------------
