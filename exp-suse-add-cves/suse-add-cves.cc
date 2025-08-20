@@ -155,12 +155,12 @@ namespace {
 
 	void usage(const char *prog, std::ostream &os)
 	{
-		os << prog << std::endl;
-		os << "  --help, -h                 - Print this help message" << std::endl;
-		os << "  --vulns, -v <path>         - Path to the clone of https://git.kernel.org/pub/scm/linux/security/vulns.git ($VULNS_GIT)" << std::endl;
-		os << "  --init, -i                 - Clone the upstream vulns repository;  You need to provide at least -v!" << std::endl;
-		os << "  --from_stdin, -f           - Read paths to patches from stdin instead of arguments" << std::endl;
-		os << "  --ksource_git, -k          - Just process all files in $KSOURCE_GIT/patches.suse" << std::endl;
+		os << prog << " [PATH_TO_A_PATCH...]\n";
+		os << "  --help, -h                 - Print this help message\n";
+		os << "  --vulns, -v <path>         - Path to the clone of https://git.kernel.org/pub/scm/linux/security/vulns.git ($VULNS_GIT)\n";
+		os << "  --init, -i                 - Clone the upstream vulns repository;  You need to provide at least -v!\n";
+		os << "  --from_stdin, -f           - Read paths to patches from stdin instead of arguments\n";
+		os << "  --ksource_git, -k          - Just process all files in $KSOURCE_GIT/patches.suse\n";
 	}
 
 	struct option opts[] = {
