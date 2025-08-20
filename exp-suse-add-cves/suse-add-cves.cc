@@ -18,7 +18,7 @@
 
 namespace {
 	void usage(const char *prog, std::ostream &os);
-	std::vector<std::string> read_patch_sans_new_lines(std::istream &, bool);
+	template<bool> std::vector<std::string> read_patch_sans_new_lines(std::istream &);
 	std::string get_hash(const std::vector<std::string> &, long&);
 	long get_references_idx(const std::vector<std::string> &);
 	bool already_has_cve_ref(const std::string&, const std::string&);
@@ -107,7 +107,7 @@ int main(int argc, char **argv)
 			continue;
 		}
 
-		auto lines = read_patch_sans_new_lines(file, false);
+		auto lines = read_patch_sans_new_lines<false>(file);
 		long sha_idx;
 		const auto sha = get_hash(lines, sha_idx);
 		if (sha.size() != 40 && !is_hex(sha)) {
@@ -195,7 +195,7 @@ namespace {
 				gm.init = true;
 				break;
 			case 'f':
-				gm.paths = read_patch_sans_new_lines(std::cin, true);
+				gm.paths = read_patch_sans_new_lines<true>(std::cin);
 				break;
 			case 'k':
 				gm.paths = read_all_patches();
@@ -259,12 +259,12 @@ namespace {
 		return ref_line.find(bsc_number) != std::string::npos;
 	}
 
-	std::vector<std::string> read_patch_sans_new_lines(std::istream &f, bool trim)
+	template<bool trim> std::vector<std::string> read_patch_sans_new_lines(std::istream &f)
 	{
 		std::vector<std::string> ret;
 
 		for (std::string line; std::getline(f, line);)
-			if(trim)
+			if constexpr (trim)
 				ret.push_back(strip(line));
 			else
 				ret.push_back(line);
