@@ -243,10 +243,8 @@ namespace {
 			else if (isalnum(c))
 				ret.push_back(tolower(c));
 		}
-		if (ret.empty()) {
+		if (ret.empty())
 			fail_with_message("The subsystem name \"" + s + "\" is so bizarre that it ended up being empty!");
-			throw 1;
-		}
 		return ret;
 	}
 
