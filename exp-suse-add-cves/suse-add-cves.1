@@ -1,0 +1,76 @@
+.TH SUSE\-ADD\-CVES 1
+
+.SH NAME
+suse\-add\-cves \- adding CVE and Bugzilla references to SUSE kernel patches
+
+.SH SYNOPSIS
+.B suse\-add\-cves
+[\fBPATH_TO_A_PATCH...\fR]
+
+.SH DESCRIPTION
+
+.B suse\-add\-cves
+utility takes paths to individual patches as arguments and adds CVE
+and Bugzilla references to those that are fixing CVE issues.
+
+
+.SH OPTIONS
+
+.TP
+.BR \-h ", " \-\-help
+Print this help message
+
+.TP
+.BR \-v ", " \-\-vulns=PATH
+Path to the upstream vulnerability repository (normally taken from
+$VULNS_GIT).
+
+.TP
+.BR \-i ", " \-\-init
+Clone the upstream vulnerability repository to the directory provided
+in \-v or \-\-vulns option.
+
+.TP
+.BR \-f ", " \-\-from_stdin
+Take paths to patches from STDIN one per line.
+
+.TP
+.BR \-k ", " \-\-ksource_git
+Try to add references all CVE fixing patches found in
+$KSOURCE_GIT/patches.suse.
+
+
+.SH EXAMPLES
+
+Clone upstream vulnerability repository into /tmp/vulns_git
+
+.RS
+$ suse\-add\-cves -v /tmp/vulns_git -i
+.RE
+
+Try to add references to everything in $KSOURCE_GIT/patches.suse
+
+.RS
+$ suse\-add\-cves -k
+.RE
+
+Try to add references to the list of patches from
+/tmp/list_of_patches.txt.
+
+.RS
+$ cat /tmp/list_of_patches.txt | suse\-add\-cves -f
+.RE
+
+
+.SH TODO
+Parsing branches.conf file for handling non-top-level branches.
+
+.SH BUGS
+Report any bugs to <jslaby@suse.cz>.
+
+.SH AUTHORS
+
+.RE
+Miroslav Franc <mfranc@gmx.com>
+.RE
+

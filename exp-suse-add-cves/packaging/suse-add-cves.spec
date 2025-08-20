@@ -1,5 +1,5 @@
 Name:           suse-add-cves
-Version:        0.9.6
+Version:        0.9.7
 Release:        0
 Summary:        A tool to update CVE reference in patches
 License:        GPL-3.0-or-later
@@ -39,8 +39,10 @@ is never older than 15 minutes.
 
 %install
 install -b -D -m 755 %{name} %{buildroot}/%{_bindir}/%{name}
+install -b -D -m 644 %{name}.1.gz %{buildroot}/%{_mandir}/man1/%{name}.1.gz
 
 %files
 %{_bindir}/%{name}
+%doc %{_mandir}/man1/%{name}.1.gz
 
 %changelog
