@@ -39,6 +39,13 @@ namespace {
 		(std::cerr << ... << args) << std::endl;
 	}
 
+	struct NonCopyable
+	{
+		NonCopyable() = default;
+		NonCopyable(const NonCopyable&) = delete;
+		NonCopyable& operator=(const NonCopyable&) = delete;
+	};
+
 	bool is_hex(const std::string_view s)
 	{
 		return std::all_of(s.cbegin(), s.cend(), ::isxdigit);

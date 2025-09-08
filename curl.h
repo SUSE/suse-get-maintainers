@@ -9,7 +9,7 @@
 
 namespace
 {
-	struct LibCurl
+	struct LibCurl : NonCopyable
 	{
 		LibCurl()
 			{
@@ -19,7 +19,7 @@ namespace
 		~LibCurl() { curl_global_cleanup(); }
 	};
 
-	struct CurlHandle
+	struct CurlHandle : NonCopyable
 	{
 		CurlHandle()
 			{
@@ -36,7 +36,7 @@ namespace
 		CURL *m_curl_handle;
 	};
 
-	struct PageFile
+	struct PageFile : NonCopyable
 	{
 		PageFile(const std::string &path)
 			{

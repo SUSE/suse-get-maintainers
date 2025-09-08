@@ -12,7 +12,7 @@
 #include "git2.h"
 
 namespace {
-	struct CVEHashMap {
+	struct CVEHashMap : NonCopyable {
 		CVEHashMap(int y, bool r, bool d) : year(y), rejected(r), douze(d) {}
 
 		bool load(const std::string &vsource);

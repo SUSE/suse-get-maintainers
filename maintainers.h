@@ -13,7 +13,7 @@
 #include "helpers.h"
 
 namespace {
-	struct Pattern {
+	struct Pattern : NonCopyable {
 		Pattern(std::string_view p)
 			{
 				std::string pattern{p};
@@ -26,8 +26,6 @@ namespace {
 					fail_with_message(git_error_last()->message);
 			}
 		~Pattern() { git_pathspec_free(m_pathspec); }
-		Pattern& operator=(const Pattern&) = delete;
-		Pattern(const Pattern&) = delete;
 		Pattern& operator=(Pattern&& p) = delete;
 		Pattern(Pattern&& p)
 			{

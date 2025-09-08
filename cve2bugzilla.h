@@ -10,7 +10,7 @@
 #include "helpers.h"
 
 namespace {
-	struct CVE2Bugzilla {
+	struct CVE2Bugzilla : NonCopyable {
 		CVE2Bugzilla() {}
 
 		bool load(const std::string &cve2bugzilla);

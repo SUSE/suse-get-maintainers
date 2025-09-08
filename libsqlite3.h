@@ -5,13 +5,10 @@
 #include "helpers.h"
 
 namespace {
-	struct Database
+	struct Database : NonCopyable
 	{
 		Database() : database(nullptr) {}
 		~Database() { sqlite3_close(database); }
-
-		Database(const Database&) = delete;
-		Database& operator=(const Database&) = delete;
 
 		Database(Database&& o) noexcept : database(o.database) {
 			o.database = nullptr;
@@ -48,13 +45,10 @@ namespace {
 		int count;
 	};
 
-	struct Statement
+	struct Statement : NonCopyable
 	{
 		Statement() : statement(nullptr) {}
 		~Statement() { sqlite3_finalize(statement); }
-
-		Statement(const Statement&) = delete;
-		Statement& operator=(const Statement&) = delete;
 
 		Statement(Statement&& o) noexcept : statement(o.statement) {
 			o.statement = nullptr;

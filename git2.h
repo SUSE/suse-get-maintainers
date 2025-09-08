@@ -20,7 +20,7 @@ namespace {
 				emit_message(str, " does not seem to be a SHA hash of at least ", min, " characters long");
 	}
 
-	struct LibGit2
+	struct LibGit2 : NonCopyable
 	{
 		LibGit2() { git_libgit2_init(); }
 		~LibGit2() { git_libgit2_shutdown(); }
@@ -48,7 +48,7 @@ namespace {
 		return 0;
 	}
 
-	struct Repo
+	struct Repo : NonCopyable
 	{
 		Repo() : m_repo(nullptr) {}
 		~Repo() { git_repository_free(m_repo); }
@@ -86,7 +86,7 @@ namespace {
 		return 0;
 	}
 
-	struct Remote
+	struct Remote : NonCopyable
 	{
 		Remote() : m_remote(nullptr)
 			{
@@ -114,7 +114,7 @@ namespace {
 		git_fetch_options m_fetch_opts;
 	};
 
-	struct Object
+	struct Object : NonCopyable
 	{
 		Object() : m_object(nullptr) {}
 		~Object() { git_object_free(m_object); }
@@ -124,7 +124,7 @@ namespace {
 		git_object *m_object;
 	};
 
-	struct Commit
+	struct Commit : NonCopyable
 	{
 		Commit() : m_commit(nullptr) {}
 		~Commit() { git_commit_free(m_commit); }
@@ -159,7 +159,7 @@ namespace {
 		git_commit *m_commit;
 	};
 
-	struct Tree
+	struct Tree : NonCopyable
 	{
 		Tree() : m_tree(nullptr) {}
 		~Tree() { git_tree_free(m_tree); }
@@ -190,7 +190,7 @@ namespace {
 		return 0;
 	}
 
-	struct Files
+	struct Files : NonCopyable
 	{
 		int from_tree_filtered(const Tree &tree, const std::regex &r)
 			{
@@ -207,14 +207,14 @@ namespace {
 		std::unordered_map<std::string, git_oid> m_paths;
 	};
 
-	struct TreeEntry
+	struct TreeEntry : NonCopyable
 	{
 		TreeEntry() : te(nullptr) {}
 		~TreeEntry() { git_tree_entry_free(te); }
 		git_tree_entry *te;
 	};
 
-	struct Blob
+	struct Blob : NonCopyable
 	{
 		Blob() : m_blob(nullptr) {}
 		~Blob() { git_blob_free(m_blob); }
