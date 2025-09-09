@@ -42,6 +42,7 @@ namespace {
 		std::string maintainers;
 		std::string kernel_tree;
 		std::string origin = "origin";
+		std::string cve_branch = "origin/master";
 		std::set<std::string> shas;
 		std::set<std::string> paths;
 		std::set<std::string> diffs;
@@ -136,7 +137,7 @@ int main(int argc, char **argv)
 		load_upstream_maintainers_file(upstream_maintainers, suse_users, gm.kernel_tree, gm.origin);
 
 	if (!gm.fixes.empty()) {
-		CVEHashMap cve_hash_map{gm.year, gm.rejected, true};
+		CVEHashMap cve_hash_map{gm.cve_branch, gm.year, gm.rejected, true};
 		if (!cve_hash_map.load(gm.vulns))
 			fail_with_message("Unable to load kernel vulns database git tree: ", gm.vulns);
 		constexpr const char cve2bugzilla_url[] = "https://gitlab.suse.de/security/cve-database/-/raw/master/data/cve2bugzilla";
@@ -260,7 +261,7 @@ int main(int argc, char **argv)
 		return 0;
 	}
 
-	CVEHashMap cve_hash_map{gm.year, gm.rejected, false};
+	CVEHashMap cve_hash_map{gm.cve_branch, gm.year, gm.rejected, false};
 	bool has_cves = false;
 
 	if (!gm.cves.empty() || gm.all_cves) {
@@ -364,6 +365,7 @@ namespace {
 		os << "  --maintainers, -m <file>      - Custom path to the MAINTAINERS file instead of $HOME/.cache/suse-get-maintainers/MAINTAINERS\n";
 		os << "  --kernel_tree, -k <dir>       - Clone of the mainline kernel repo ($LINUX_GIT)\n";
 		os << "  --origin, -o <remote>         - Use some other remote than origin (useful only for $LINUX_GIT)\n";
+		os << "  --cve_branch, -b              - Which branch do we care about in $VULNS_GIT repository (by default origin/master)\n";
 		os << "  --vulns, -v <path>            - Path to the clone of https://git.kernel.org/pub/scm/linux/security/vulns.git ($VULNS_GIT)\n";
 		os << "  --sha, -s [<sha>|-]...        - SHA of a commit for which we want to find owners; - as stdin batch mode implies CSV output\n";
 		os << "                                  this option can be provided multiple times with different values\n";
@@ -398,6 +400,7 @@ namespace {
 		{ "maintainers", required_argument, nullptr, 'm' },
 		{ "kernel_tree", required_argument, nullptr, 'k' },
 		{ "origin", required_argument, nullptr, 'o' },
+		{ "cve_branch", no_argument, nullptr, 'b' },
 		{ "sha", required_argument, nullptr, 's' },
 		{ "path", required_argument, nullptr, 'p' },
 		{ "diff", required_argument, nullptr, 'd' },
@@ -431,7 +434,7 @@ namespace {
 		for (;;) {
 			int opt_idx;
 
-			c = getopt_long(argc, argv, "hm:k:o:s:p:d:v:c:w:g:f:CRy:rijSantNMDV", opts, &opt_idx);
+			c = getopt_long(argc, argv, "hm:k:o:b:s:p:d:v:c:w:g:f:CRy:rijSantNMDV", opts, &opt_idx);
 			if (c == -1)
 				break;
 
@@ -447,6 +450,9 @@ namespace {
 				break;
 			case 'o':
 				gm.origin = optarg;
+				break;
+			case 'b':
+				gm.cve_branch = optarg;
 				break;
 			case 's':
 				option = optarg;

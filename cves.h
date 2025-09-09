@@ -13,7 +13,7 @@
 
 namespace {
 	struct CVEHashMap : NonCopyable {
-		CVEHashMap(int y, bool r, bool d) : year(y), rejected(r), douze(d) {}
+		CVEHashMap(const std::string &b, int y, bool r, bool d) : branch(b), year(y), rejected(r), douze(d) {}
 
 		bool load(const std::string &vsource);
 		std::vector<std::string> get_shas(const std::string &cve_number) const;
@@ -24,6 +24,7 @@ namespace {
 		std::unordered_multimap<std::string, std::string> m_cve_hash_multimap;
 		std::unordered_map<std::string, std::string> m_sha_hash_map;
 		std::unordered_map<std::string, std::string> m_douze_hash_map;
+		std::string branch;
 		int year;
 		bool rejected;
 		bool douze;
@@ -39,19 +40,19 @@ namespace {
 		if (vulns_repo.from_path(vsource))
 			fail_with_message("Unable to open vulns.git at ", vsource, " ;", git_error_last()->message);
 
-		const std::string error_message = "Unable to load vulns.git tree for origin/master; ";
+		const std::string error_message = "Unable to load vulns.git tree for ";
 
 		Object obj;
-		if (obj.from_rev(vulns_repo, "origin/master"))
-			fail_with_message(error_message, git_error_last()->message);
+		if (obj.from_rev(vulns_repo, branch))
+			fail_with_message(error_message, branch, "; ", git_error_last()->message);
 
 		Commit commit;
 		if (commit.from_oid(vulns_repo, git_object_id(obj.get())))
-			fail_with_message(error_message, git_error_last()->message);
+			fail_with_message(error_message, branch, "; ", git_error_last()->message);
 
 		Tree commit_tree;
 		if (commit_tree.from_commit(commit))
-			fail_with_message(error_message, git_error_last()->message);
+			fail_with_message(error_message, branch, "; ", git_error_last()->message);
 
 		const std::string cve_prefix = rejected ? "cve/rejected/" : "cve/published/";
 
@@ -61,14 +62,14 @@ namespace {
 
 		Files files;
 		if (files.from_tree_filtered(commit_tree, regex_sha1_file))
-			fail_with_message(error_message, git_error_last()->message);
+			fail_with_message(error_message, branch, "; ", git_error_last()->message);
 
 		if (files.m_paths.empty() && year)
 			throw 0;
 
 		FilesContents fc;
 		if (fc.from_tree_and_files(commit_tree, files))
-			fail_with_message(error_message, git_error_last()->message);
+			fail_with_message(error_message, branch, "; ", git_error_last()->message);
 
 		const auto regex_cve_number = std::regex("CVE-[0-9][0-9][0-9][0-9]-[0-9]+", std::regex::optimize);
 		for (const auto &[file, contents]: fc.m_contents) {
