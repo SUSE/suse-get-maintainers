@@ -28,7 +28,7 @@ namespace {
 	void show_people(const std::vector<Person> &, const std::string &, bool);
 	bool whois(const std::vector<Stanza> &, const std::string &);
 	bool grep(const std::vector<Stanza> &, const std::string &, bool);
-	bool fixes(const std::vector<Stanza> &, const std::string &, bool, bool, const CVEHashMap &, const CVE2Bugzilla &);
+	bool fixes(const std::vector<Stanza> &, const std::string &, bool, bool, const CVEHashMap<ShaSize::Short> &, const CVE2Bugzilla &);
 	std::set<std::string> read_stdin_sans_new_lines();
 	template<typename F>
 	void for_all_stanzas(Statement &stmt,
@@ -137,7 +137,7 @@ int main(int argc, char **argv)
 		load_upstream_maintainers_file(upstream_maintainers, suse_users, gm.kernel_tree, gm.origin);
 
 	if (!gm.fixes.empty()) {
-		CVEHashMap cve_hash_map{gm.cve_branch, gm.year, gm.rejected, true};
+		CVEHashMap<ShaSize::Short> cve_hash_map{gm.cve_branch, gm.year, gm.rejected};
 		if (!cve_hash_map.load(gm.vulns))
 			fail_with_message("Unable to load kernel vulns database git tree: ", gm.vulns);
 		constexpr const char cve2bugzilla_url[] = "https://gitlab.suse.de/security/cve-database/-/raw/master/data/cve2bugzilla";
@@ -261,7 +261,7 @@ int main(int argc, char **argv)
 		return 0;
 	}
 
-	CVEHashMap cve_hash_map{gm.cve_branch, gm.year, gm.rejected, false};
+	CVEHashMap<ShaSize::Long> cve_hash_map{gm.cve_branch, gm.year, gm.rejected};
 	bool has_cves = false;
 
 	if (!gm.cves.empty() || gm.all_cves) {
@@ -710,7 +710,7 @@ namespace {
 		return found;
 	}
 
-	bool fixes(const std::vector<Stanza> &stanzas, const std::string &grep, bool csv, bool trace, const CVEHashMap &cve_hash_map, const CVE2Bugzilla &cve_to_bugzilla)
+	bool fixes(const std::vector<Stanza> &stanzas, const std::string &grep, bool csv, bool trace, const CVEHashMap<ShaSize::Short> &cve_hash_map, const CVE2Bugzilla &cve_to_bugzilla)
 	{
 		const auto re = std::regex(grep, std::regex::icase | std::regex::optimize);
 		bool found = false;
@@ -791,7 +791,7 @@ namespace {
 
 					const auto possible_sha = (line.size() > 13 && line[12] == ' ') ? line.substr(0, 12) : "nope";
 					if (is_hex(possible_sha)) {
-						possible_cve = cve_hash_map.get_cve_douze(possible_sha);
+						possible_cve = cve_hash_map.get_cve(possible_sha);
 						csv_details[commit] = possible_sha;
 					} else if (csv) {
 						line_not_hex_to_csv();
