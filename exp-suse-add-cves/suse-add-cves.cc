@@ -26,6 +26,7 @@ namespace {
 	void parse_options(int argc, char **argv);
 	struct gm {
 		std::string vulns;
+		std::string cve_branch = "origin/master";
 		std::vector<std::string> paths;
 		bool init = false;
 	} gm;
@@ -84,7 +85,7 @@ int main(int argc, char **argv)
 		}
 	}
 
-	CVEHashMap cve_hash_map{0, false, false};
+	CVEHashMap<ShaSize::Long> cve_hash_map{gm.cve_branch, 0, false};
 	if (!cve_hash_map.load(gm.vulns))
 		fail_with_message("Couldn't load kernel vulns database git tree");
 
@@ -158,6 +159,7 @@ namespace {
 		os << prog << " [PATH_TO_A_PATCH...]\n";
 		os << "  --help, -h                 - Print this help message\n";
 		os << "  --vulns, -v <path>         - Path to the clone of https://git.kernel.org/pub/scm/linux/security/vulns.git ($VULNS_GIT)\n";
+		os << "  --cve_branch, -b           - Which branch do we care about in $VULNS_GIT repository (by default origin/master)\n";
 		os << "  --init, -i                 - Clone the upstream vulns repository;  You need to provide at least -v!\n";
 		os << "  --from_stdin, -f           - Read paths to patches from stdin instead of arguments\n";
 		os << "  --ksource_git, -k          - Just process all files in $KSOURCE_GIT/patches.suse\n";
@@ -166,6 +168,7 @@ namespace {
 	struct option opts[] = {
 		{ "help", no_argument, nullptr, 'h' },
 		{ "vulns", required_argument, nullptr, 'v' },
+		{ "cve_branch", no_argument, nullptr, 'b' },
 		{ "from_stdin", no_argument, nullptr, 'f' },
 		{ "ksource_git", no_argument, nullptr, 'k' },
 		{ "init", no_argument, nullptr, 'i' },
@@ -180,7 +183,7 @@ namespace {
 		for (;;) {
 			int opt_idx;
 
-			c = getopt_long(argc, argv, "hv:ifk", opts, &opt_idx);
+			c = getopt_long(argc, argv, "hv:b:ifk", opts, &opt_idx);
 			if (c == -1)
 				break;
 
@@ -190,6 +193,9 @@ namespace {
 				std::exit(0);
 			case 'v':
 				gm.vulns = optarg;
+				break;
+			case 'b':
+				gm.cve_branch = optarg;
 				break;
 			case 'i':
 				gm.init = true;
