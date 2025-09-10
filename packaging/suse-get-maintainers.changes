@@ -1,4 +1,12 @@
 -------------------------------------------------------------------
+Wed Sep 10 09:36:06 AM CEST 2025 - Miroslav Franc <mfranc@suse.cz>
+
+- Update version 1.4.5
+  * some refactorings
+  * update man page
+  * dd --cve_branch or -b option for $VULNS_GIT "origin/master"
+
+-------------------------------------------------------------------
 Fri Aug  8 02:05:29 PM CEST 2025 - Miroslav Franc <mfranc@suse.cz>
 
 - Update version 1.4.5
