@@ -87,6 +87,11 @@ Change remote to something else than "origin".  Only valid for
 mainline (\-\-kernel_tree).
 
 .TP
+.BR \-b ", " \-\-cve_branch =\fIBRANCH\fR
+Which branch do we care about in $VULNS_GIT repository (by default
+origin/master).
+
+.TP
 .BR \-v ", " \-\-vulns =\fIDIRECTORY\fR
 Directory containing a clone of the kernel vulnerability database:
 https://git.kernel.org/pub/scm/linux/security/vulns.git.  The value is
