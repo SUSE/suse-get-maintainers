@@ -1,0 +1,1 @@
+option('SGM_VERSION', type : 'string', value : 'devel', description : 'Announced version')
