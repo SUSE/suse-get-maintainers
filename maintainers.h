@@ -3,7 +3,6 @@
 
 #include <string>
 #include <vector>
-#include <iostream>
 #include <fstream>
 #include <sstream>
 #include <algorithm>
@@ -45,7 +44,7 @@ namespace {
 
 		unsigned pattern_weight(const std::string &pattern)
 			{
-				unsigned ret = 1, idx = 0;
+				unsigned ret = 1;
 				bool seen = false;
 				for (const char c: pattern) {
 					switch (c) {
@@ -64,7 +63,6 @@ namespace {
 							seen = false;
 						}
 					}
-					++idx;
 				}
 				return ret;
 			}
