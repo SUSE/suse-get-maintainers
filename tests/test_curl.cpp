@@ -7,7 +7,7 @@ using namespace std::chrono_literals;
 static void test_is_download_needed()
 {
 	std::filesystem::path tmp_file{std::tmpnam(nullptr)};
-	bool exists;
+	bool exists = false;
 
 	std::cout << __func__ << ": " << tmp_file << '\n';
 
