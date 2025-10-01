@@ -51,16 +51,16 @@ namespace {
 		return std::all_of(s.cbegin(), s.cend(), ::isxdigit);
 	}
 
-	std::string_view trim(const std::string_view line)
+	std::string_view trim(const std::string_view &line)
 	{
 		static constexpr const char *spaces = " \n\t\r";
 		const auto pos1 = line.find_first_not_of(spaces);
 		const auto pos2 = line.find_last_not_of(spaces);
 
 		if (pos1 == std::string::npos)
-			return std::string("");
+			return {};
 
-		return std::string_view(line).substr(pos1, pos2-pos1+1);
+		return line.substr(pos1, pos2-pos1+1);
 	}
 
 	const std::string sign_offs[] = {
