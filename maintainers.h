@@ -7,8 +7,8 @@
 #include <sstream>
 #include <algorithm>
 #include <numeric>
-#include <git2.h>
 
+#include "git2.h"
 #include "helpers.h"
 
 namespace {
