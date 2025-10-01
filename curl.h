@@ -50,7 +50,7 @@ namespace
 		FILE* m_pagefile;
 	};
 
-	static inline std::filesystem::path get_cache_dir()
+	std::filesystem::path get_cache_dir()
 	{
 		const auto xdg_cache_dir = std::getenv("XDG_CACHE_HOME");
 		if (xdg_cache_dir)
@@ -63,16 +63,15 @@ namespace
 		return std::filesystem::path(home_dir) / ".cache";
 	}
 
-	static inline std::filesystem::path get_maintainers_cache_dir()
+	std::filesystem::path get_maintainers_cache_dir()
 	{
 		const auto cache = get_cache_dir() / "suse-get-maintainers";
 		std::filesystem::create_directories(cache);
 		return cache;
 	}
 
-	static inline bool is_download_needed(const std::filesystem::path &file_path,
-					      bool &file_already_exists, bool force_refresh,
-					      const std::chrono::hours &hours)
+	bool is_download_needed(const std::filesystem::path &file_path, bool &file_already_exists,
+				bool force_refresh, const std::chrono::hours &hours)
 	{
 		if (!std::filesystem::exists(file_path))
 			return true;
@@ -87,12 +86,12 @@ namespace
 		return mtime < now - hours;
 	}
 
-	static inline std::filesystem::path fetch_file_if_needed(const std::filesystem::path &existing_path,
-								 const std::filesystem::path &name,
-								 const std::string &url,
-								 bool trace, bool force_refresh,
-								 bool ignore_errors,
-								 const std::chrono::hours &hours)
+	std::filesystem::path fetch_file_if_needed(const std::filesystem::path &existing_path,
+						   const std::filesystem::path &name,
+						   const std::string &url,
+						   bool trace, bool force_refresh,
+						   bool ignore_errors,
+						   const std::chrono::hours &hours)
 	{
 		if (!existing_path.empty())
 			return existing_path;
