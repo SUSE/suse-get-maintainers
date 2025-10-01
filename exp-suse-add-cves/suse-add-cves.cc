@@ -1,8 +1,8 @@
+#include <chrono>
 #include <fstream>
 #include <vector>
 #include <regex>
 #include <cstdlib>
-#include <ctime>
 #include <filesystem>
 
 #include <getopt.h>
@@ -24,7 +24,7 @@ namespace {
 	bool already_has_bsc_ref(const std::string&, const std::string&);
 	void parse_options(int argc, char **argv);
 	struct gm {
-		std::string vulns;
+		std::filesystem::path vulns;
 		std::string cve_branch = "origin/master";
 		std::vector<std::string> paths;
 		bool init = false;
@@ -65,26 +65,22 @@ int main(int argc, char **argv)
 	}
 
 	{
-		constexpr const char origin_master_file[] = "/.git/refs/remotes/origin/master";
-		const std::string origin_master_ref = gm.vulns + origin_master_file;
+		const auto origin_master_ref = gm.vulns / ".git/refs/remotes/origin/master";
 
-		struct stat sb;
-		if (stat(origin_master_ref.c_str(), &sb) == 0) {
-			struct timespec current_time;
-			timespec_get(&current_time, TIME_UTC);
+		if (std::filesystem::exists(origin_master_ref)) {
+			const auto mtime = std::filesystem::last_write_time(origin_master_ref);
+			const auto now = std::filesystem::file_time_type::clock::now();
+			constexpr const std::chrono::minutes expires_after{15};
 
-			constexpr decltype(current_time.tv_sec) expires_after_seconds = 60 * 15;
-			decltype(current_time.tv_sec) time_diff = current_time.tv_sec - sb.st_mtim.tv_sec;
-			if (time_diff > expires_after_seconds) {
+			if (mtime < now - expires_after) {
 				fetch_repo(gm.vulns, "origin");
 				cve2bugzilla_file = fetch_file_if_needed({}, "cve2bugzilla.txt",
 									 cve2bugzilla_url,
 									 false, true, false,
 									 std::chrono::hours{12});
 			}
-			struct utimbuf t;
-			t.modtime = current_time.tv_sec;
-			utime(origin_master_ref.c_str(), &t);
+			std::filesystem::last_write_time(origin_master_ref, now);
+
 		}
 	}
 
