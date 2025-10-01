@@ -6,7 +6,6 @@ test_curl = executable('test_curl', [
   implicit_include_directories: false,
   include_directories: [ '..' ],
   dependencies: deps,
-  install: true,
 )
 
 test('curl unit tests', test_curl)
