@@ -94,7 +94,7 @@ namespace {
 
 	std::string to_string(Role r) { return sign_offs[index(r)]; }
 
-	bool is_suse_address(const std::set<std::string> &users, const std::string &email)
+	bool is_suse_address([[maybe_unused]] const std::set<std::string> &users, const std::string &email)
 	{
 		return (email.ends_with("@suse.com") || email.ends_with("@suse.cz") || email.ends_with("@suse.de"));
 		//&& users.contains(email.substr(0, email.find_first_of("@")));
