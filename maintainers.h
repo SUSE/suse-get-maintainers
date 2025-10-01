@@ -206,7 +206,7 @@ namespace {
 			}
 			if (line == "THE REST")
 				break;
-			if (line.size() < 3 || line[1] == '\t' || line[1] == ' ' || line[1] == '.' || line[1] == '-')
+			if (line.size() < 3 || std::strchr("\t .-", line[1]))
 				continue;
 			if (line[1] == ':')
 				switch(line[0]) {
