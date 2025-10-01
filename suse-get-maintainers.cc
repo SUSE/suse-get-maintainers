@@ -104,7 +104,7 @@ int main(int argc, char **argv)
 		gm.conf_file_map = fetch_file_if_needed({}, "conf_file_map.sqlite", conf_file_map, gm.trace, gm.refresh, false, std::chrono::days{7});
 
 	// TODO
-	temporary = fetch_file_if_needed({}, "user-bugzilla-map.txt", "https://kerncvs.suse.de/user-bugzilla-map.txt", gm.trace, gm.refresh, false, std::chrono::hours{12});
+	const auto temporary = fetch_file_if_needed({}, "user-bugzilla-map.txt", "https://kerncvs.suse.de/user-bugzilla-map.txt", gm.trace, gm.refresh, false, std::chrono::hours{12});
 	load_temporary(translation_table, temporary);
 	// END TODO
 

@@ -16,7 +16,6 @@
 // TODO
 #include <unordered_map>
 std::unordered_map<std::string, std::string> translation_table;
-std::string temporary;
 bool do_not_translate = false;
 // END TODO
 

@@ -1,6 +1,7 @@
 #ifndef SGM_TEMPORARY_H
 #define SGM_TEMPORARY_H
 
+#include <filesystem>
 #include <fstream>
 #include <string>
 #include <string_view>
@@ -9,7 +10,8 @@
 #include "helpers.h"
 
 namespace {
-	void load_temporary(std::unordered_map<std::string, std::string> &h, const std::string &filename)
+	void load_temporary(std::unordered_map<std::string, std::string> &h,
+			    const std::filesystem::path &filename)
 	{
 		std::ifstream file{filename};
 
