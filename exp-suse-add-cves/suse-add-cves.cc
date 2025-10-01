@@ -1,7 +1,6 @@
 #include <fstream>
 #include <vector>
 #include <regex>
-#include <cstdio>
 #include <cstdlib>
 #include <ctime>
 #include <filesystem>
@@ -98,13 +97,7 @@ int main(int argc, char **argv)
 		fail_with_message("Couldn't load cve2bugzilla.txt");
 
 	for (auto const &p: gm.paths) {
-		std::string path_to_patch;
-		if (!p.empty() && p[0] != '/') {
-			const char *pwd = std::getenv("PWD");
-			if (pwd)
-				path_to_patch = std::string(pwd) + "/" + p;
-		} else
-			path_to_patch = p;
+		const auto path_to_patch = std::filesystem::absolute(p);
 
 		std::ifstream file(path_to_patch);
 		if (!file.is_open()) {
@@ -137,7 +130,7 @@ int main(int argc, char **argv)
 				lines[idx] += " " + bsc;
 		}
 
-		std::string new_patch = path_to_patch;
+		std::filesystem::path new_patch{path_to_patch};
 		new_patch += ".NEW";
 
 		std::ofstream new_file(new_patch);
@@ -149,7 +142,7 @@ int main(int argc, char **argv)
 		for (const auto &l: lines)
 			new_file << l << std::endl;
 
-		rename(new_patch.c_str(), path_to_patch.c_str());
+		std::filesystem::rename(new_patch, path_to_patch);
 	}
 
 	SGM_END;
