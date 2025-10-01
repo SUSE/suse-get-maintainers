@@ -1,8 +1,9 @@
 #ifndef SGM_CURL_H
 #define SGM_CURL_H
 
-#include <ctime>
-#include <sys/stat.h>
+#include <filesystem>
+#include <string>
+
 #include <curl/curl.h>
 
 #include "helpers.h"
@@ -38,7 +39,7 @@ namespace
 
 	struct PageFile : NonCopyable
 	{
-		PageFile(const std::string &path)
+		PageFile(const std::filesystem::path &path)
 			{
 				m_pagefile = std::fopen(path.c_str(), "wb");
 			}
@@ -49,64 +50,77 @@ namespace
 		FILE* m_pagefile;
 	};
 
-	std::string fetch_file_if_needed(std::string maintainers_path, const std::string &name, const std::string &url, bool trace, bool refresh, bool ignore_errors, int hours)
+	static inline std::filesystem::path get_cache_dir()
 	{
-		if (!maintainers_path.empty())
-			return maintainers_path;
+		const auto xdg_cache_dir = std::getenv("XDG_CACHE_HOME");
+		if (xdg_cache_dir)
+			return xdg_cache_dir;
 
-		const char *xdg_cache_dir = std::getenv("XDG_CACHE_HOME");
-		if(xdg_cache_dir)
-			maintainers_path = xdg_cache_dir;
-		else {
-			const char *home_dir = std::getenv("HOME");
-			if(home_dir)
-				maintainers_path = home_dir;
-			else
-				fail_with_message("Unable to open HOME directory!");
-			maintainers_path += "/.cache";
-		}
-		struct stat sb;
-		if (stat(maintainers_path.c_str(), &sb) == -1)
-			if(mkdir(maintainers_path.c_str(), 0755))
-				fail_with_message("Unable to create .cache directory!");
-		maintainers_path += "/suse-get-maintainers";
-		if (stat(maintainers_path.c_str(), &sb) == -1)
-			if (mkdir(maintainers_path.c_str(), 0755))
-				fail_with_message("Unable to locate .cache/suse-get-maintainers directory!");
+		const auto home_dir = std::getenv("HOME");
+		if (!home_dir)
+			fail_with_message("Unable to open HOME directory!");
 
-		maintainers_path.push_back('/');
-		maintainers_path += name;
+		return std::filesystem::path(home_dir) / ".cache";
+	}
+
+	static inline std::filesystem::path get_maintainers_cache_dir()
+	{
+		const auto cache = get_cache_dir() / "suse-get-maintainers";
+		std::filesystem::create_directories(cache);
+		return cache;
+	}
+
+	static inline bool is_download_needed(const std::filesystem::path &file_path,
+					      bool &file_already_exists, bool force_refresh,
+					      const std::chrono::hours &hours)
+	{
+		if (!std::filesystem::exists(file_path))
+			return true;
+
+		file_already_exists = true;
+		if (force_refresh)
+			return true;
+
+		const auto mtime = std::filesystem::last_write_time(file_path);
+		const auto now = std::filesystem::file_time_type::clock::now();
+
+		return mtime < now - hours;
+	}
+
+	static inline std::filesystem::path fetch_file_if_needed(const std::filesystem::path &existing_path,
+								 const std::filesystem::path &name,
+								 const std::string &url,
+								 bool trace, bool force_refresh,
+								 bool ignore_errors,
+								 const std::chrono::hours &hours)
+	{
+		if (!existing_path.empty())
+			return existing_path;
+
+		auto file_path = get_maintainers_cache_dir() / name;
 
 		bool file_already_exists = false;
-		if (stat(maintainers_path.c_str(), &sb) == 0) {
-			file_already_exists = true;
-			if (!refresh) {
-				struct timespec current_time;
-				timespec_get(&current_time, TIME_UTC);
+		if (!is_download_needed(file_path, file_already_exists, force_refresh, hours))
+			return file_path;
 
-				const decltype(current_time.tv_sec) expires_after_seconds = 60 * 60 * hours;
-				decltype(current_time.tv_sec) time_diff = current_time.tv_sec - sb.st_mtim.tv_sec;
-				if (time_diff < expires_after_seconds)
-					return maintainers_path;
-			}
-		}
-		if (trace || refresh)
-			emit_message("Downloading... ", maintainers_path, " from ", url);
+		if (trace || force_refresh)
+			emit_message("Downloading... ", file_path, " from ", url);
 
 		LibCurl libcurl;
 		CurlHandle curl_handle;
 		curl_handle.set_url(url);
 
-		const std::string new_path = maintainers_path + ".NEW";
+		auto new_path(file_path);
+		new_path += ".NEW";
 		PageFile pagefile(new_path);
 		if (pagefile) {
 			curl_easy_setopt(curl_handle.get(), CURLOPT_WRITEDATA, pagefile.get());
 			if (curl_easy_perform(curl_handle.get())) {
 				if (ignore_errors)
 					return "";
-				emit_message("Failed to fetch ", name, " from ", url, " to ", maintainers_path);
+				emit_message("Failed to fetch ", name, " from ", url, " to ", file_path);
 				if (file_already_exists)
-					return maintainers_path;
+					return file_path;
 				else
 					throw 1;
 			}
@@ -115,15 +129,15 @@ namespace
 			if (http_code >= 400) {
 				if (ignore_errors)
 					return "";
-				emit_message("Failed to fetch ", name," (", http_code, ") from ", url, " to ", maintainers_path);
+				emit_message("Failed to fetch ", name," (", http_code, ") from ", url, " to ", file_path);
 				if (file_already_exists)
-					return maintainers_path;
+					return file_path;
 				else
 					throw 1;
 			}
-			rename(new_path.c_str(), maintainers_path.c_str());
+			std::filesystem::rename(new_path, file_path);
 		}
-		return maintainers_path;
+		return file_path;
 	}
 }
 

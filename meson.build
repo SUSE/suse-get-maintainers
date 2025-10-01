@@ -31,3 +31,5 @@ executable(prj_name,
 )
 
 install_man(prj_name + '.1')
+
+subdir('tests')

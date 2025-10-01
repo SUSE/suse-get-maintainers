@@ -44,7 +44,8 @@ int main(int argc, char **argv)
 
 	LibGit2 lg2_state;
 	constexpr const char cve2bugzilla_url[] = "https://gitlab.suse.de/security/cve-database/-/raw/master/data/cve2bugzilla";
-	std::string cve2bugzilla_file = fetch_file_if_needed(std::string(), "cve2bugzilla.txt", cve2bugzilla_url, false, false, false, 12);
+	auto cve2bugzilla_file = fetch_file_if_needed({}, "cve2bugzilla.txt", cve2bugzilla_url,
+						      false, false, false, std::chrono::hours{12});
 
 	if (gm.init) {
 		if (!gm.vulns.empty()) {
@@ -77,7 +78,10 @@ int main(int argc, char **argv)
 			decltype(current_time.tv_sec) time_diff = current_time.tv_sec - sb.st_mtim.tv_sec;
 			if (time_diff > expires_after_seconds) {
 				fetch_repo(gm.vulns, "origin");
-				cve2bugzilla_file = fetch_file_if_needed(std::string(), "cve2bugzilla.txt", cve2bugzilla_url, false, true, false, 12);
+				cve2bugzilla_file = fetch_file_if_needed({}, "cve2bugzilla.txt",
+									 cve2bugzilla_url,
+									 false, true, false,
+									 std::chrono::hours{12});
 			}
 			struct utimbuf t;
 			t.modtime = current_time.tv_sec;

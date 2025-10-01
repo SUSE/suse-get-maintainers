@@ -39,7 +39,7 @@ namespace {
 			     const std::string &);
 
 	struct gm {
-		std::string maintainers;
+		std::filesystem::path maintainers;
 		std::string kernel_tree;
 		std::string origin = "origin";
 		std::string cve_branch = "origin/master";
@@ -97,14 +97,14 @@ int main(int argc, char **argv)
 		fail_with_message("You must provide at least --kernel_tree (-k) or --vulns (-v) or both!");
 
 	constexpr const char maintainers_url[] = "https://kerncvs.suse.de/MAINTAINERS";
-	gm.maintainers = fetch_file_if_needed(gm.maintainers, "MAINTAINERS", maintainers_url, gm.trace, gm.refresh, false, 12);
+	gm.maintainers = fetch_file_if_needed(gm.maintainers, "MAINTAINERS", maintainers_url, gm.trace, gm.refresh, false, std::chrono::hours{12});
 
 	constexpr const char conf_file_map[] = "https://kerncvs.suse.de/conf_file_map.sqlite";
 	if (!gm.no_db)
-		gm.conf_file_map = fetch_file_if_needed(std::string(), "conf_file_map.sqlite", conf_file_map, gm.trace, gm.refresh, false, 24 * 7);
+		gm.conf_file_map = fetch_file_if_needed({}, "conf_file_map.sqlite", conf_file_map, gm.trace, gm.refresh, false, std::chrono::days{7});
 
 	// TODO
-	temporary = fetch_file_if_needed(std::string(), "user-bugzilla-map.txt", "https://kerncvs.suse.de/user-bugzilla-map.txt", gm.trace, gm.refresh, false, 12);
+	temporary = fetch_file_if_needed({}, "user-bugzilla-map.txt", "https://kerncvs.suse.de/user-bugzilla-map.txt", gm.trace, gm.refresh, false, std::chrono::hours{12});
 	load_temporary(translation_table, temporary);
 	// END TODO
 
@@ -141,7 +141,7 @@ int main(int argc, char **argv)
 		if (!cve_hash_map.load(gm.vulns))
 			fail_with_message("Unable to load kernel vulns database git tree: ", gm.vulns);
 		constexpr const char cve2bugzilla_url[] = "https://gitlab.suse.de/security/cve-database/-/raw/master/data/cve2bugzilla";
-		std::string cve2bugzilla_file = fetch_file_if_needed(std::string(), "cve2bugzilla.txt", cve2bugzilla_url, false, false, false, 12);
+		std::string cve2bugzilla_file = fetch_file_if_needed({}, "cve2bugzilla.txt", cve2bugzilla_url, false, false, false, std::chrono::hours{12});
 		CVE2Bugzilla cve_to_bugzilla;
 		if (!cve_to_bugzilla.load(cve2bugzilla_file))
 			fail_with_message("Couldn't load cve2bugzilla.txt");
@@ -732,7 +732,7 @@ namespace {
 			});
 		}
 		for (const auto &mf: files) {
-			std::string mf_on_the_disk = fetch_file_if_needed(std::string(), mf, "http://fixes.prg2.suse.org/current/" + mf, trace, false, true, 12);
+			auto mf_on_the_disk = fetch_file_if_needed({}, mf, "http://fixes.prg2.suse.org/current/" + mf, trace, false, true, std::chrono::hours{12});
 			if (csv)
 				std::cout << "commit,subsys-part,sle-versions,bsc,cve\n";
 			else
