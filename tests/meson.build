@@ -1,12 +1,13 @@
 # SPDX-License-Identifier: GPL-2.0-only
 
-test_curl = executable('test_curl', [
-    'test_curl.cpp',
-  ],
-  implicit_include_directories: false,
-  include_directories: [ '..' ],
-  dependencies: deps,
-)
+tests = {
+  'curl' : [ libcurl ],
+  'maintainers' : [ libgit2 ],
+}
 
-test('curl unit tests', test_curl)
-
+foreach t : tests.keys()
+  test(t, executable('test_' + t, 'test_' + t + '.cpp',
+    dependencies: tests[t],
+    implicit_include_directories: false,
+  ))
+endforeach
