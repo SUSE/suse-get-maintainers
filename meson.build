@@ -19,7 +19,7 @@ endif
 
 libcurl = dependency('libcurl')
 libgit2 = dependency('libgit2')
-sqlite3 = dependency('sqlite3')
+sqlite3 = dependency('slsqlite++')
 
 prj_name = meson.project_name()
 executable(prj_name,

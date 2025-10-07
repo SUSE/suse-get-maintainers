@@ -8,18 +8,56 @@
 #include <unistd.h>
 #include <filesystem>
 
+#include <sl/sqlite/SQLConn.h>
+
 #include "helpers.h"
 #include "git2.h"
 #include "cves.h"
 #include "curl.h"
 #include "maintainers.h"
 #include "cve2bugzilla.h"
-#include "libsqlite3.h"
 // TODO
 #include "temporary.h"
 // END TODO
 
 namespace {
+
+	class SQLConn : public SlSqlite::SQLConn {
+	public:
+		virtual int prepDB() {
+			if (prepareStatement("SELECT user.email, sum(map.count) AS cnt "
+					     "FROM user_file_map AS map "
+					     "LEFT JOIN user ON map.user = user.id "
+					     "WHERE map.file = (SELECT id FROM file WHERE file = :file "
+					     "AND dir = (SELECT id FROM dir WHERE dir = :dir)) "
+					     "GROUP BY substr(user.email, 0, instr(user.email, '@')) "
+					     "ORDER BY cnt DESC, user.email "
+					     "LIMIT :limit;", selGetMaintainers))
+				return -1;
+
+			return 0;
+		}
+
+		std::optional<SlSqlite::SQLConn::SelectResult>
+		get_maintainers(const std::string &file, const std::string &dir, int limit) const
+		{
+			SlSqlite::SQLConn::SelectResult res;
+
+			if (select(selGetMaintainers, {
+					{ ":file", file },
+					{ ":dir", dir },
+					{ ":limit", limit },
+					}, { typeid(std::string), typeid(int) }, res))
+				return {};
+
+			return res;
+		}
+
+		explicit operator bool() const { return sqlHolder.operator bool(); }
+	private:
+		SlSqlite::SQLStmtHolder selGetMaintainers;
+	};
+
 	void parse_options(int argc, char **argv);
 	void fetch_repo(const std::string &, const std::string &);
 	void show_emails(const Stanza &m, const std::string&);
@@ -31,7 +69,7 @@ namespace {
 	bool fixes(const std::vector<Stanza> &, const std::string &, bool, bool, const CVEHashMap<ShaSize::Short> &, const CVE2Bugzilla &);
 	std::set<std::string> read_stdin_sans_new_lines();
 	template<typename F>
-	void for_all_stanzas(Statement &stmt,
+	void for_all_stanzas(const SQLConn &db,
 			     const std::vector<Stanza> &,
 			     const std::vector<Stanza> &,
 			     const std::set<std::string> &,
@@ -172,15 +210,10 @@ int main(int argc, char **argv)
 			fetch_repo(gm.kernel_tree, gm.origin);
 	}
 
-	Database db;
+	SQLConn db;
 	if (!gm.no_db)
-		if (db.from_path(gm.conf_file_map))
+		if (db.open(gm.conf_file_map))
 			fail_with_message("Failed to open db: ", gm.conf_file_map);
-
-	Statement stmt;
-	if (!gm.no_db)
-		if (stmt.prepare_get_maintainers(db))
-			fail_with_message("Failed to prepare statement: ", get_maintainers);
 
 
 	if (!gm.paths.empty()) {
@@ -201,12 +234,12 @@ int main(int argc, char **argv)
 					what += color_format(gm.colors, T_BLUE, "\"path\"") + ": " + color_format(gm.colors, T_GREEN, "\"" + p + "\"");
 				} else
 					what = p;
-				for_all_stanzas(stmt, maintainers, upstream_maintainers, std::set<std::string>{p}, gm.json ? json_output : csv_output, what);
+				for_all_stanzas(db, maintainers, upstream_maintainers, std::set<std::string>{p}, gm.json ? json_output : csv_output, what);
 			}
 			if (gm.json)
 				std::cout << "\n]\n";
 		} else
-			for_all_stanzas(stmt, maintainers, upstream_maintainers, gm.paths, show_emails, "");
+			for_all_stanzas(db, maintainers, upstream_maintainers, gm.paths, show_emails, "");
 		return 0;
 	}
 
@@ -240,7 +273,7 @@ int main(int argc, char **argv)
 						const std::vector<Person> sb = std::get<std::vector<Person>>(s);
 						show_people(sb, what, false);
 					} else
-						for_all_stanzas(stmt, maintainers, upstream_maintainers, std::get<std::set<std::string>>(s), gm.json ? json_output : csv_output, what);
+						for_all_stanzas(db, maintainers, upstream_maintainers, std::get<std::set<std::string>>(s), gm.json ? json_output : csv_output, what);
 				} catch (...) { continue; }
 			}
 			if (gm.json)
@@ -256,7 +289,7 @@ int main(int argc, char **argv)
 				const std::vector<Person> sb = std::get<std::vector<Person>>(s);
 				show_people(sb, "", true);
 			} else
-				for_all_stanzas(stmt, maintainers, upstream_maintainers, std::get<std::set<std::string>>(s), show_emails, "");
+				for_all_stanzas(db, maintainers, upstream_maintainers, std::get<std::set<std::string>>(s), show_emails, "");
 		}
 		return 0;
 	}
@@ -323,7 +356,7 @@ int main(int argc, char **argv)
 			std::cout << "[\n";
 
 		search_commit(rk, gm.shas, suse_users, gm.only_maintainers, gm.trace,
-			      [&maintainers, &upstream_maintainers, &has_cves, &first, &cve_hash_map, &stmt, simple]
+			      [&maintainers, &upstream_maintainers, &has_cves, &first, &cve_hash_map, &db, simple]
 			      (const std::string &sha, const std::vector<Person> &sb, const std::set<std::string> &paths) {
 			if (gm.trace && !paths.empty()) {
 				std::cerr << "SHA " << sha << " contains the following paths: " << std::endl;
@@ -346,7 +379,7 @@ int main(int argc, char **argv)
 			if (!sb.empty()) {
 				show_people(sb, what, simple);
 			} else
-				for_all_stanzas(stmt, maintainers, upstream_maintainers, paths, simple ? show_emails : gm.json ? json_output : csv_output, what);
+				for_all_stanzas(db, maintainers, upstream_maintainers, paths, simple ? show_emails : gm.json ? json_output : csv_output, what);
 		});
 		if (gm.json)
 			std::cout << "\n]\n";
@@ -843,8 +876,14 @@ namespace {
 		return ret;
 	}
 
+	struct GetMaintainers
+	{
+		std::string email;
+		int count;
+	};
+
 	template<typename F>
-	void for_all_stanzas(Statement &stmt,
+	void for_all_stanzas(const SQLConn &db,
 			     const std::vector<Stanza> &suse_stanzas,
 			     const std::vector<Stanza> &upstream_stanzas,
 			     const std::set<std::string> &paths,
@@ -869,28 +908,31 @@ namespace {
 			return;
 		}
 
-		if (stmt) {
-			std::vector<GetMaintainers> out;
+		if (db) {
+			std::unordered_map<std::string, int> emails_and_counts_m;
 			for (const std::string &p: paths) {
 				const std::filesystem::path path(p);
 				const std::string dir = path.parent_path(), file = path.filename();
 
-				if (stmt.bind_get_maitainers(file, dir, 4))
-					fail_with_message("Failed to bind parameters: ", file, dir, 4);
-
-				if (stmt.step_get_maitainers(out))
+				auto mOpt = db.get_maintainers(file, dir, 4);
+				if (!mOpt)
 					fail_with_message("Failed to query.");
-			}
-			if (!out.empty()) {
-				std::unordered_map<std::string, int> emails_and_counts_m;
-				for (const auto &e: out) {
-					auto result = emails_and_counts_m.insert({e.email, e.count});
-					if (!result.second)
-						result.first->second += e.count;
+				for (auto &m : *mOpt) {
+					const auto email = std::move(std::get<std::string>(m[0]));
+					const auto count = std::get<int>(m[1]);
+					emails_and_counts_m[email] += count;
 				}
+			}
+			if (!emails_and_counts_m.empty()) {
+				struct GetMaintainers
+				{
+					std::string email;
+					int count;
+				};
+
 				std::vector<GetMaintainers> emails_and_counts_v;
 				for (const auto &e: emails_and_counts_m)
-					emails_and_counts_v.push_back(GetMaintainers(e.first, e.second));
+					emails_and_counts_v.push_back(GetMaintainers(std::move(e.first), e.second));
 				std::sort(emails_and_counts_v.begin(), emails_and_counts_v.end(), [](const GetMaintainers &a, const GetMaintainers &b) {
 					return a.count > b.count;
 				});
