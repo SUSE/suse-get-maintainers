@@ -15,15 +15,14 @@ if host_machine.cpu_family() == 'x86_64'
   add_project_arguments('-march=x86-64-v2', language: 'cpp')
 endif
 
-deps = []
-deps += dependency('libcurl')
-deps += dependency('libgit2')
+libcurl = dependency('slcurl++')
+libgit = dependency('libgit2')
 
 prj_name = meson.project_name()
 executable(prj_name,
   [ prj_name + '.cc' ],
   implicit_include_directories: false,
-  dependencies: deps,
+  dependencies: [ libcurl, libgit ],
   install: true,
 )
 

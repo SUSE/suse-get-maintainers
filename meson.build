@@ -17,7 +17,7 @@ if host_machine.cpu_family() == 'x86_64'
   add_project_arguments('-march=x86-64-v2', language: 'cpp')
 endif
 
-libcurl = dependency('libcurl')
+libcurl = dependency('slcurl++')
 libgit2 = dependency('libgit2')
 sqlite3 = dependency('slsqlite++')
 
