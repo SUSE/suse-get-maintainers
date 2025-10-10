@@ -18,7 +18,7 @@ if host_machine.cpu_family() == 'x86_64'
 endif
 
 libcurl = dependency('slcurl++')
-libgit2 = dependency('libgit2')
+libgit2 = dependency('slgit++')
 sqlite3 = dependency('slsqlite++')
 
 prj_name = meson.project_name()

@@ -172,30 +172,17 @@ namespace {
 
 	void load_upstream_maintainers_file(std::vector<Stanza> &stanzas, const std::set<std::string> &suse_users, const std::string &lsource, const std::string &origin)
 	{
-		Repo linux_repo;
-
-		if (linux_repo.from_path(lsource))
+		auto linux_repo = SlGit::Repo::open(lsource);
+		if (!linux_repo)
 			fail_with_message("Unable to open linux.git at ", lsource, " ;", git_error_last()->message);
 
 		const std::string error_message = "Unable to load linux.git tree for " + origin + "/master; ";
 
-		Object obj;
-		if (obj.from_rev(linux_repo, origin + "/master"))
+		auto maintOpt = linux_repo->catFile(origin + "/master", "MAINTAINERS");
+		if (!maintOpt)
 			fail_with_message(error_message, git_error_last()->message);
 
-		Commit commit;
-		if (commit.from_oid(linux_repo, git_object_id(obj.get())))
-			fail_with_message(error_message, git_error_last()->message);
-
-		Tree commit_tree;
-		if (commit_tree.from_commit(commit))
-			fail_with_message(error_message, git_error_last()->message);
-
-		Blob b;
-		if (b.from_tree_and_path(commit_tree, "MAINTAINERS"))
-			fail_with_message(error_message, git_error_last()->message);
-
-		std::istringstream upstream_maintainters_file(b.get_file());
+		std::istringstream upstream_maintainters_file(*maintOpt);
 		Stanza st;
 		bool skip = true;
 		for (std::string line; getline(upstream_maintainters_file, line); ) {

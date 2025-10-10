@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <filesystem>
 
+#include <sl/git/Git.h>
 #include <sl/sqlite/SQLConn.h>
 
 #include "helpers.h"
@@ -59,7 +60,6 @@ namespace {
 	};
 
 	void parse_options(int argc, char **argv);
-	void fetch_repo(const std::string &, const std::string &);
 	void show_emails(const Stanza &m, const std::string&);
 	void csv_output(const Stanza &m, const std::string&);
 	void json_output(const Stanza &m, const std::string&);
@@ -146,21 +146,18 @@ int main(int argc, char **argv)
 	load_temporary(translation_table, temporary);
 	// END TODO
 
-	LibGit2 libgit2_state;
 	const std::size_t libgit2_limit_opened_files = (get_soft_limit_for_opened_files(min_total_opened_files) - tracking_fixes_opened_files) / libgit2_opened_files_factor;
 	if (git_libgit2_opts(GIT_OPT_SET_MWINDOW_FILE_LIMIT, libgit2_limit_opened_files))
 	    emit_message("Could not set a limit for opened files: ", libgit2_limit_opened_files);
 
 	if (gm.init) {
 		if (!gm.kernel_tree.empty()) {
-			Repo repo;
-			if (repo.clone(gm.kernel_tree, "https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git"))
+			if (!SlGit::Repo::clone(gm.kernel_tree, "https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git"))
 				fail_with_message(git_error_last()->message);
 			emit_message("\n\nexport LINUX_GIT=\"", gm.kernel_tree, "\" # store into ~/.bashrc\n\n");
 		}
 		if (!gm.vulns.empty()) {
-			Repo repo;
-			if (repo.clone(gm.vulns, "https://git.kernel.org/pub/scm/linux/security/vulns.git"))
+			if (!SlGit::Repo::clone(gm.vulns, "https://git.kernel.org/pub/scm/linux/security/vulns.git"))
 				fail_with_message(git_error_last()->message);
 			emit_message("\n\nexport VULNS_GIT=\"", gm.vulns, "\" # store into ~/.bashrc\n\n");
 		}
@@ -341,8 +338,8 @@ int main(int argc, char **argv)
 		if (gm.kernel_tree.empty())
 			fail_with_message("Provide a path to mainline git kernel tree either via -k or $LINUX_GIT");
 
-		Repo rk;
-		if (rk.from_path(gm.kernel_tree))
+		auto rkOpt = SlGit::Repo::open(gm.kernel_tree);
+		if (!rkOpt)
 			fail_with_message("Unable load kernel tree: ", gm.kernel_tree, " (", git_error_last()->message, ")");
 
 		if (gm.shas.size() == 1 && gm.from_stdin && !has_cves)
@@ -355,7 +352,7 @@ int main(int argc, char **argv)
 		if (gm.json)
 			std::cout << "[\n";
 
-		search_commit(rk, gm.shas, suse_users, gm.only_maintainers, gm.trace,
+		search_commit(*rkOpt, gm.shas, suse_users, gm.only_maintainers, gm.trace,
 			      [&maintainers, &upstream_maintainers, &has_cves, &first, &cve_hash_map, &db, simple]
 			      (const std::string &sha, const std::vector<Person> &sb, const std::set<std::string> &paths) {
 			if (gm.trace && !paths.empty()) {

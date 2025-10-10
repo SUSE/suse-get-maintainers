@@ -56,10 +56,10 @@ static void test_stanza()
 
 int main()
 {
-	LibGit2 libgit2_state;
-
+	git_libgit2_init();
 	test_pattern();
 	test_stanza();
+	git_libgit2_shutdown();
 
 	return 0;
 }

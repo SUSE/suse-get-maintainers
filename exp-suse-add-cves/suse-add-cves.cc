@@ -9,8 +9,9 @@
 #include <sys/stat.h>
 #include <utime.h>
 
+#include <sl/git/Repo.h>
+
 #include "helpers.h"
-#include "git2.h"
 #include "cves.h"
 #include "curl.h"
 #include "cve2bugzilla.h"
@@ -41,15 +42,13 @@ int main(int argc, char **argv)
 	if (gm.paths.empty() && (!gm.init || gm.vulns.empty()))
 		fail_with_message("You must provide at least one patch or clone the vulns repository with --init (-i) and --vulns (-v)!  See --help (-h)!");
 
-	LibGit2 lg2_state;
 	constexpr const char cve2bugzilla_url[] = "https://gitlab.suse.de/security/cve-database/-/raw/master/data/cve2bugzilla";
 	auto cve2bugzilla_file = fetch_file_if_needed({}, "cve2bugzilla.txt", cve2bugzilla_url,
 						      false, false, false, std::chrono::hours{12});
 
 	if (gm.init) {
 		if (!gm.vulns.empty()) {
-			Repo repo;
-			if (repo.clone(gm.vulns, "https://git.kernel.org/pub/scm/linux/security/vulns.git"))
+			if (!SlGit::Repo::clone(gm.vulns, "https://git.kernel.org/pub/scm/linux/security/vulns.git"))
 				fail_with_message(git_error_last()->message);
 			emit_message("\n\nexport VULNS_GIT=\"", gm.vulns, "\" # store into ~/.bashrc\n\n");
 		}
@@ -73,7 +72,7 @@ int main(int argc, char **argv)
 			constexpr const std::chrono::minutes expires_after{15};
 
 			if (mtime < now - expires_after) {
-				fetch_repo(gm.vulns, "origin");
+				SlGit::Repo::update(gm.vulns);
 				cve2bugzilla_file = fetch_file_if_needed({}, "cve2bugzilla.txt",
 									 cve2bugzilla_url,
 									 false, true, false,

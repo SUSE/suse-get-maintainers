@@ -16,7 +16,7 @@ if host_machine.cpu_family() == 'x86_64'
 endif
 
 libcurl = dependency('slcurl++')
-libgit = dependency('libgit2')
+libgit = dependency('slgit++')
 
 prj_name = meson.project_name()
 executable(prj_name,
