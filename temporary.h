@@ -7,6 +7,8 @@
 #include <string_view>
 #include <unordered_map>
 
+#include <sl/helpers/String.h>
+
 #include "helpers.h"
 
 namespace {
@@ -26,8 +28,8 @@ namespace {
 				emit_message("user-bugzilla-map.txt: ", line);
 				continue;
 			}
-			std::string_view user = trim(std::string_view(line).substr(0, equal_sign_idx));
-			std::string_view bz_user = trim(std::string_view(line).substr(equal_sign_idx + 1));
+			const auto user = SlHelpers::String::trim(std::string_view(line).substr(0, equal_sign_idx));
+			const auto bz_user = SlHelpers::String::trim(std::string_view(line).substr(equal_sign_idx + 1));
 			if (user.empty() || bz_user.empty()) {
 				emit_message("user-bugzilla-map.txt: ", line);
 				continue;

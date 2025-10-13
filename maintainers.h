@@ -8,6 +8,8 @@
 #include <algorithm>
 #include <numeric>
 
+#include <sl/helpers/String.h>
+
 #include "git2.h"
 #include "helpers.h"
 
@@ -144,14 +146,14 @@ namespace {
 
 		Stanza st;
 		for (std::string line; getline(file, line);) {
-			std::string_view tmp = trim(line);
+			const auto tmp = SlHelpers::String::trim(line);
 			if (tmp.size() < 2)
 				continue;
 			if (tmp[1] == ':') {
 				if (tmp[0] == 'M')
 					st.add_maintainer_and_store(tmp, suse_users);
 				else if (tmp[0] == 'F') {
-					std::string_view fpattern = trim(tmp.substr(2));
+					const auto fpattern = SlHelpers::String::trim(tmp.substr(2));
 					if (fpattern.empty())
 						emit_message("MAINTAINERS entry: ", tmp);
 					else
@@ -214,7 +216,7 @@ namespace {
 					st.add_maintainer_if(line, suse_users);
 					break;
 				case 'F':
-					std::string_view fpattern = trim(std::string_view(line).substr(2));
+					const auto fpattern = SlHelpers::String::trim(std::string_view(line).substr(2));
 					if (fpattern.empty())
 						emit_message("Upstream MAINTAINERS entry: ", line);
 					else

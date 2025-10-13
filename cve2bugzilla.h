@@ -7,6 +7,8 @@
 #include <string_view>
 #include <fstream>
 
+#include <sl/helpers/String.h>
+
 #include "helpers.h"
 
 namespace {
@@ -41,8 +43,8 @@ namespace {
 				emit_message("user-bugzilla-map.txt: ", line);
 				continue;
 			}
-			std::string_view cve_number = trim(std::string_view(line).substr(0, cve_end_idx));
-			std::string_view bsc_number = trim(std::string_view(line).substr(bsc_begin_idx + 1));
+			std::string_view cve_number = SlHelpers::String::trim(std::string_view(line).substr(0, cve_end_idx));
+			std::string_view bsc_number = SlHelpers::String::trim(std::string_view(line).substr(bsc_begin_idx + 1));
 			if (cve_number.empty() || bsc_number.empty()) {
 				emit_message("user-bugzilla-map.txt: ", line);
 				continue;

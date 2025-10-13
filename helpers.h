@@ -2,7 +2,6 @@
 #define SGM_HELPERS_H
 
 #include <iostream>
-#include <algorithm>
 #include <variant>
 #include <fstream>
 #include <cstdlib>
@@ -12,6 +11,8 @@
 #include <cstring>
 #include <string_view>
 #include <sys/resource.h>
+
+#include <sl/helpers/String.h>
 
 // TODO
 #include <unordered_map>
@@ -44,18 +45,6 @@ namespace {
 		NonCopyable(const NonCopyable&) = delete;
 		NonCopyable& operator=(const NonCopyable&) = delete;
 	};
-
-	std::string_view trim(const std::string_view &line)
-	{
-		static constexpr const char *spaces = " \n\t\r";
-		const auto pos1 = line.find_first_not_of(spaces);
-		const auto pos2 = line.find_last_not_of(spaces);
-
-		if (pos1 == std::string::npos)
-			return {};
-
-		return line.substr(pos1, pos2-pos1+1);
-	}
 
 	const std::string sign_offs[] = {
 		"Author",
@@ -109,7 +98,7 @@ namespace {
 			if (src.find_first_of(">", e_sign) != std::string::npos)
 				return false;
 			else {
-				email = trim(src.substr(e_sign));
+				email = SlHelpers::String::trim(src.substr(e_sign));
 				if (email.find_first_of(" \n\t\r") != std::string::npos)
 					return false;
 				else {
@@ -119,7 +108,7 @@ namespace {
 			}
 		if (b_mail > pos)
 			return false;
-		name = trim(src.substr(e_sign, b_mail - e_sign));
+		name = SlHelpers::String::trim(src.substr(e_sign, b_mail - e_sign));
 		if (name.empty())
 			return false;
 		auto e_mail = src.find_first_of(">", b_mail);

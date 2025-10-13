@@ -518,7 +518,7 @@ std::set<std::string> read_stdin_sans_new_lines()
 	std::set<std::string> ret;
 
 	for (std::string line; std::getline(std::cin, line);)
-		ret.insert(std::string(trim(line)));
+		ret.insert(SlHelpers::String::trim(line));
 
 	return ret;
 }

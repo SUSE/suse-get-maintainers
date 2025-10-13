@@ -211,18 +211,6 @@ namespace {
 			gm.paths.emplace_back(argv[i]);
 	}
 
-	std::string strip(const std::string &line)
-	{
-		static constexpr const char *spaces = " \n\t\r";
-		const auto pos1 = line.find_first_not_of(spaces);
-		const auto pos2 = line.find_last_not_of(spaces);
-
-		if (pos1 == std::string::npos)
-			return std::string("");
-
-		return line.substr(pos1, pos2-pos1+1);
-	}
-
 	std::string get_hash(const std::vector<std::string> &v, long &idx)
 	{
 		thread_local const auto git_commit_regex = std::regex("Git-commit: ([0-9a-fA-F]+)", std::regex::optimize);
@@ -230,7 +218,7 @@ namespace {
 		idx = 0;
 		for (const auto &line: v) {
 			if (std::regex_search(line, match, git_commit_regex))
-				return strip(match.str(1));
+				return SlHelpers::String::trim(match.str(1));
 			++idx;
 		}
 
@@ -266,7 +254,7 @@ namespace {
 
 		for (std::string line; std::getline(f, line);)
 			if constexpr (trim)
-				ret.push_back(strip(line));
+				ret.push_back(SlHelpers::String::trim(line));
 			else
 				ret.push_back(line);
 
