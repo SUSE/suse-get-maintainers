@@ -1,3 +1,4 @@
+#include <cxxopts.hpp>
 #include <fstream>
 #include <string>
 #include <set>
@@ -62,24 +63,23 @@ private:
 struct gm {
 	std::filesystem::path maintainers;
 	std::filesystem::path kernel_tree;
-	std::string origin = "origin";
-	std::string cve_branch = "origin/master";
+	std::string origin;
+	std::string cve_branch;
 	std::set<std::string> shas;
 	std::set<std::string> paths;
 	std::set<std::string> diffs;
+	std::set<std::string> cves;
 	std::filesystem::path vulns;
 	std::string whois;
 	std::string grep;
 	std::string fixes;
 	std::filesystem::path conf_file_map;
-	std::set<std::string> cves;
 	unsigned int year;
 	bool rejected;
 	bool all_cves;
 	bool json;
 	bool csv;
 	bool names;
-	bool from_stdin;
 	bool trace;
 	bool refresh;
 	bool init;
@@ -87,6 +87,8 @@ struct gm {
 	bool only_maintainers;
 	bool no_db;
 	bool colors;
+
+	bool from_stdin;
 } gm;
 
 constexpr std::size_t tracking_fixes_opened_files = 64;
@@ -94,190 +96,146 @@ constexpr std::size_t min_total_opened_files = 80;
 constexpr std::size_t libgit2_opened_files_factor = 2;
 static_assert(min_total_opened_files >= tracking_fixes_opened_files + libgit2_opened_files_factor);
 
-void usage(const char *prog, std::ostream &os)
-{
-	os << prog << " (version: " SUSE_GET_MAINTAINERS_VERSION ") For more information, read the man page.\n";
-	os << "  --help, -h                    - Print this help message\n";
-	os << "  --maintainers, -m <file>      - Custom path to the MAINTAINERS file instead of $HOME/.cache/suse-get-maintainers/MAINTAINERS\n";
-	os << "  --kernel_tree, -k <dir>       - Clone of the mainline kernel repo ($LINUX_GIT)\n";
-	os << "  --origin, -o <remote>         - Use some other remote than origin (useful only for $LINUX_GIT)\n";
-	os << "  --cve_branch, -b              - Which branch do we care about in $VULNS_GIT repository (by default origin/master)\n";
-	os << "  --vulns, -v <path>            - Path to the clone of https://git.kernel.org/pub/scm/linux/security/vulns.git ($VULNS_GIT)\n";
-	os << "  --sha, -s [<sha>|-]...        - SHA of a commit for which we want to find owners; - as stdin batch mode implies CSV output\n";
-	os << "                                  this option can be provided multiple times with different values\n";
-	os << "                                  SHA could be in shortened form of at least 12 characters\n";
-	os << "  --path, -p [<path>|-]...      - Path for which we want to find owners; - as stdin batch mode implies CSV output\n";
-	os << "                                  this option can be provided multiple times with different values\n";
-	os << "  --diff, -d [<path>|-]...      - Path to a patch we want to find owners; - as stdin batch mode implies CSV output\n";
-	os << "                                  this option can be provided multiple times with different values\n";
-	os << "  --cve, -c [<CVE number>|-]... - CVE number for which we want to find owners; - as stdin batch mode implies CSV output\n";
-	os << "                                  this option can be provided multiple times with different values\n";
-	os << "  --whois, -w [EMAIL|USERNAME]  - Look-up a maintainer and show his subsystems\n";
-	os << "  --grep, -g [REGEX]            - Grep maintainers (both emails and names) and subsystems and show the list of maintainer,subsystem for the matches; doesn't support -j yet\n";
-	os << "  --fixes, -f [REGEX]           - Grep maintainers (both emails and names) and subsystems and show the list of current fixes for the matches (EXPERIMENTAL)\n";
-	os << "  --all_cves, -C                - Resolve all kernel CVEs and find owners for them; CSV output; use -j or --json option for JSON\n";
-	os << "  --rejected, -R                - Query rejected CVEs instead of the published ones.  To be used with -c, -C and -y.\n";
-	os << "  --year, -y [year]             - Resolve all kernel CVEs from a given year; CSV output; use -j or --json option for JSON\n";
-	os << "  --refresh, -r                 - Refresh MAINTAINERS file and update (fetch origin) $VULNS_GIT and $LINUX_GIT if present\n";
-	os << "  --init, -i                    - Clone upstream repositories;  You need to provide at least -k or -v or both!\n";
-	os << "  --json, -j                    - Output JSON\n";
-	os << "  --csv, -S                     - Output CSV\n";
-	os << "  --colors_always, -a           - Always show colors; by default, they only show when the stdout is connected to the terminal\n";
-	os << "  --names, -n                   - Include full names with the emails; by default, just emails are extracted\n";
-	os << "  --no_translation, -N          - Do not translate to bugzilla emails\n";
-	os << "  --only_maintainers, -M        - Do not analyze the patches/commits; only MAINTAINERS files\n";
-	os << "  --no_db, -D                   - Do not fetch/process conf_file_map.sqlite db and therefore do not report backporters\n";
-	os << "  --trace, -t                   - Be a bit more verbose about how we got there on STDERR\n";
-	os << "  --version, -V                 - Print just the version number\n";
+template <typename T>
+void moveVecToSet(const std::vector<T> &vec, std::set<T> &set) {
+	set.insert(std::make_move_iterator(vec.begin()), std::make_move_iterator(vec.end()));
 }
-
-struct option opts[] = {
-	{ "help", no_argument, nullptr, 'h' },
-	{ "maintainers", required_argument, nullptr, 'm' },
-	{ "kernel_tree", required_argument, nullptr, 'k' },
-	{ "origin", required_argument, nullptr, 'o' },
-	{ "cve_branch", no_argument, nullptr, 'b' },
-	{ "sha", required_argument, nullptr, 's' },
-	{ "path", required_argument, nullptr, 'p' },
-	{ "diff", required_argument, nullptr, 'd' },
-	{ "vulns", required_argument, nullptr, 'v' },
-	{ "cve", required_argument, nullptr, 'c' },
-	{ "whois", required_argument, nullptr, 'w' },
-	{ "grep", required_argument, nullptr, 'g' },
-	{ "fixes", required_argument, nullptr, 'f' },
-	{ "rejected", no_argument, nullptr, 'R' },
-	{ "all_cves", no_argument, nullptr, 'C' },
-	{ "year", required_argument, nullptr, 'y' },
-	{ "refresh", no_argument, nullptr, 'r' },
-	{ "init", no_argument, nullptr, 'i' },
-	{ "json", no_argument, nullptr, 'j' },
-	{ "csv", no_argument, nullptr, 'S' },
-	{ "colors_always", no_argument, nullptr, 'a' },
-	{ "names", no_argument, nullptr, 'n' },
-	{ "trace", no_argument, nullptr, 't' },
-	{ "no_translation", no_argument, nullptr, 'N' },
-	{ "only_maintainers", no_argument, nullptr, 'M' },
-	{ "no_db", no_argument, nullptr, 'D' },
-	{ "version", no_argument, nullptr, 'V' },
-	{ nullptr, 0, nullptr, 0 },
-};
 
 void parse_options(int argc, char **argv)
 {
-	int c;
-	std::string option;
+	cxxopts::Options options { argv[0],
+				"(version: " SUSE_GET_MAINTAINERS_VERSION ") For more information, read the man page.\n" };
+	std::vector<decltype(gm.shas)::key_type> shas;
+	std::vector<decltype(gm.paths)::key_type> paths;
+	std::vector<decltype(gm.diffs)::key_type> diffs;
+	std::vector<decltype(gm.cves)::key_type> cves;
+	options.add_options()
+		("h,help", "Print this help message")
+		("V,version", "Print just the version number")
 
-	for (;;) {
-		int opt_idx;
+		("r,refresh", "Refresh MAINTAINERS file and update (fetch origin) $VULNS_GIT and "
+			      "$LINUX_GIT if present",
+			cxxopts::value(gm.refresh)->default_value("false"))
+		("i,init", "Clone upstream repositories; you need to provide at least "
+			   "-k or -v or both!",
+			cxxopts::value(gm.init)->default_value("false"))
 
-		c = getopt_long(argc, argv, "hm:k:o:b:s:p:d:v:c:w:g:f:CRy:rijSantNMDV", opts, &opt_idx);
-		if (c == -1)
-			break;
+		("D,no_db", "Do not fetch/process conf_file_map.sqlite db and therefore do not "
+			    "report backporters",
+			cxxopts::value(gm.no_db)->default_value("false"))
+	;
+	options.add_options("paths")
+		("m,maintainers", "Custom path to the MAINTAINERS file instead of "
+				  "$HOME/.cache/suse-get-maintainers/MAINTAINERS",
+			cxxopts::value(gm.maintainers))
+		("k,kernel_tree", "Clone of the mainline kernel repo ($LINUX_GIT)",
+			cxxopts::value(gm.kernel_tree))
+		("o,origin", "Use some other remote than origin (useful only for $LINUX_GIT)",
+			cxxopts::value(gm.origin)->default_value("origin"))
+		("v,vulns", "Path to the clone of https://git.kernel.org/pub/scm/linux/security/vulns.git ($VULNS_GIT)",
+			cxxopts::value(gm.vulns))
+		("b,cve_branch", "Which branch do we care about in $VULNS_GIT repository",
+			cxxopts::value(gm.cve_branch)->default_value("origin/master"))
+	;
+	options.add_options("query")
+		("s,sha", "SHA of a commit for which we want to find owners; - as stdin batch mode "
+			  "implies CSV output. "
+			  "This option can be provided multiple times with different values. "
+			  "SHA could be in shortened form of at least 12 characters.",
+			cxxopts::value(shas))
+		("p,path", "Path for which we want to find owners; - as stdin batch mode implies "
+			   "CSV output. "
+			   "This option can be provided multiple times with different values.",
+			cxxopts::value(paths))
+		("d,diff", "Path to a patch we want to find owners; - as stdin batch mode implies "
+			   "CSV output. "
+			   "This option can be provided multiple times with different values.",
+			cxxopts::value(diffs))
+		("c,cve", "CVE number for which we want to find owners; - as stdin batch mode "
+			  "implies CSV output. "
+			  "This option can be provided multiple times with different values.",
+			cxxopts::value(cves))
+		("w,whois", "Look-up a maintainer and show his subsystems",
+			cxxopts::value(gm.whois))
+		("g,grep", "Grep maintainers (both emails and names) and subsystems and show the "
+			   "list of maintainer,subsystem for the matches; doesn't support -j yet",
+			cxxopts::value(gm.grep))
+		("f,fixes", "Grep maintainers (both emails and names) and subsystems and show the "
+			    "list of current fixes for the matches (EXPERIMENTAL)",
+			cxxopts::value(gm.fixes))
+		("C,all_cves", "Resolve all kernel CVEs and find owners for them; CSV output; "
+			       "use -j or --json option for JSON",
+			cxxopts::value(gm.all_cves)->default_value("false"))
+		("R,rejected", "Query rejected CVEs instead of the published ones. "
+			       "To be used with -c, -C and -y.",
+			cxxopts::value(gm.rejected)->default_value("false"))
+		("y,year", "Resolve all kernel CVEs from a given year; CSV output; "
+			   "use -j or --json option for JSON",
+			cxxopts::value(gm.year)->default_value("0"))
+	;
+	options.add_options("output")
+		("j,json", "Output JSON",
+			cxxopts::value(gm.json)->default_value("false"))
+		("S,csv", "Output CSV",
+			cxxopts::value(gm.csv)->default_value("false"))
+		("a,colors_always", "Always show colors; by default, they only show when the stdout "
+				    "is connected to the teminal",
+			cxxopts::value(gm.colors)->default_value("false"))
+		("n,names", "Include full names with the emails; by default, just emails are extracted",
+			cxxopts::value(gm.names)->default_value("false"))
+		("t,trace", "Be a bit more verbose about how we got there on STDERR",
+			cxxopts::value(gm.trace)->default_value("false"))
+		("N,no_translation", "Do not translate to bugzilla emails",
+			cxxopts::value(gm.no_translation)->default_value("false"))
+		("M,only_maintainers", "Do not analyze the patches/commits; only MAINTAINERS files",
+			cxxopts::value(gm.only_maintainers)->default_value("false"))
+	;
 
-		switch (c) {
-		case 'h':
-			usage(argv[0], std::cout);
+	try {
+		const auto opts = options.parse(argc, argv);
+		if (opts.contains("help")) {
+			std::cout << options.help();
 			throw 0;
-		case 'm':
-			gm.maintainers = optarg;
-			break;
-		case 'k':
-			gm.kernel_tree = optarg;
-			break;
-		case 'o':
-			gm.origin = optarg;
-			break;
-		case 'b':
-			gm.cve_branch = optarg;
-			break;
-		case 's':
-			option = optarg;
-			if (option == "-")
-				gm.from_stdin = true;
-			gm.shas.insert(option);
-			break;
-		case 'p':
-			option = optarg;
-			if (option == "-")
-				gm.from_stdin = true;
-			gm.paths.insert(option);
-			break;
-		case 'd':
-			option = optarg;
-			if (option == "-")
-				gm.from_stdin = true;
-			gm.diffs.insert(option);
-			break;
-		case 'v':
-			gm.vulns = optarg;
-			break;
-		case 'c':
-			option = optarg;
-			if (option == "-")
-				gm.from_stdin = true;
-			gm.cves.insert(option);
-			break;
-		case 'w':
-			gm.whois = optarg;
-			break;
-		case 'g':
-			gm.grep = optarg;
-			break;
-		case 'f':
-			gm.fixes = optarg;
-			break;
-		case 'C':
-			gm.all_cves = true;
-			break;
-		case 'R':
-			gm.rejected = true;
-			break;
-		case 'y':
-			gm.year = atoi(optarg);
+		}
+		if (opts.contains("version")) {
+			std::cout << SUSE_GET_MAINTAINERS_VERSION << '\n';
+			throw 0;
+		}
+		// TODO
+		if (gm.no_translation)
+			do_not_translate = true;
+		// END TODO
+		if (opts.contains("year")) {
 			if (gm.year < 1999 || gm.year > 9999)
 				fail_with_message(optarg, " is a year that doesn't make sense for CVE!");
 			gm.all_cves = true;
-			break;
-		case 'r':
-			gm.refresh = true;
-			break;
-		case 'i':
-			gm.init = true;
-			break;
-		case 'j':
-			gm.json = true;
-			break;
-		case 'S':
-			gm.csv = true;
-			break;
-		case 'a':
-			gm.colors = true;
-			break;
-		case 'n':
-			gm.names = true;
-			break;
-		case 't':
-			gm.trace = true;
-			break;
-		case 'N':
-			gm.no_translation = true;
-			// TODO
-			do_not_translate = true;
-			// END TODO
-			break;
-		case 'M':
-			gm.only_maintainers = true;
-			break;
-		case 'D':
-			gm.no_db = true;
-			break;
-		case 'V':
-			std::cout << SUSE_GET_MAINTAINERS_VERSION << '\n';
-			throw 0;
-		default:
-			usage(argv[0], std::cerr);
-			throw 1;
 		}
+
+		moveVecToSet(shas, gm.shas);
+		moveVecToSet(paths, gm.paths);
+		moveVecToSet(diffs, gm.diffs);
+		moveVecToSet(cves, gm.cves);
+		if (gm.shas.contains("-") || gm.paths.contains("-") || gm.diffs.contains("-") ||
+				gm.cves.contains("-"))
+			gm.from_stdin = true;
+
+		if (!gm.colors && isatty(1))
+			gm.colors = true;
+
+		if (gm.cves.empty() && gm.diffs.empty() && gm.shas.empty() && gm.paths.empty() &&
+				!gm.all_cves && !gm.refresh && !gm.init && gm.whois.empty() &&
+				gm.grep.empty() && gm.fixes.empty())
+			fail_with_message("You must provide either --sha (-s), --path (-p), "
+					  "--diff (-d), --cve (-c), --year (y), --all_cves (-C), "
+					  "--init (-i), --grep (-g), --whois (-w) or --fixes (-f)!  "
+					  "See --help (-h) for details!");
+
+		if (gm.init && gm.kernel_tree.empty() && gm.vulns.empty())
+			fail_with_message("You must provide at least --kernel_tree (-k) or --vulns (-v) or both!");
+	} catch (const cxxopts::exceptions::parsing &e) {
+		std::cerr << "arguments error: " << e.what() << '\n';
+		std::cerr << options.help();
+		throw 1;
 	}
 }
 
@@ -670,15 +628,6 @@ int main(int argc, char **argv)
 	std::set<std::string> suse_users;
 
 	parse_options(argc, argv);
-
-	if (!gm.colors && isatty(1))
-		gm.colors = true;
-
-	if (gm.cves.empty() && gm.diffs.empty() && gm.shas.empty() && gm.paths.empty() && !gm.all_cves && !gm.refresh && !gm.init && gm.whois.empty() && gm.grep.empty() && gm.fixes.empty())
-		fail_with_message("You must provide either --sha (-s), --path (-p), --diff (-d), --cve (-c), --year (y), --all_cves (-C), --init (-i), --grep (-g), --whois (-w) or --fixes (-f)!  See --help (-h) for details!");
-
-	if (gm.init && (gm.kernel_tree.empty() && gm.vulns.empty()))
-		fail_with_message("You must provide at least --kernel_tree (-k) or --vulns (-v) or both!");
 
 	constexpr const char maintainers_url[] = "https://kerncvs.suse.de/MAINTAINERS";
 	gm.maintainers = fetch_file_if_needed(gm.maintainers, "MAINTAINERS", maintainers_url, gm.trace, gm.refresh, false, std::chrono::hours{12});
