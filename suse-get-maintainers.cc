@@ -23,94 +23,640 @@
 
 namespace {
 
-	class SQLConn : public SlSqlite::SQLConn {
-	public:
-		virtual int prepDB() {
-			if (prepareStatement("SELECT user.email, sum(map.count) AS cnt "
-					     "FROM user_file_map AS map "
-					     "LEFT JOIN user ON map.user = user.id "
-					     "WHERE map.file = (SELECT id FROM file WHERE file = :file "
-					     "AND dir = (SELECT id FROM dir WHERE dir = :dir)) "
-					     "GROUP BY substr(user.email, 0, instr(user.email, '@')) "
-					     "ORDER BY cnt DESC, user.email "
-					     "LIMIT :limit;", selGetMaintainers))
-				return -1;
+class SQLConn : public SlSqlite::SQLConn {
+public:
+	virtual int prepDB() {
+		if (prepareStatement("SELECT user.email, sum(map.count) AS cnt "
+				     "FROM user_file_map AS map "
+				     "LEFT JOIN user ON map.user = user.id "
+				     "WHERE map.file = (SELECT id FROM file WHERE file = :file "
+				     "AND dir = (SELECT id FROM dir WHERE dir = :dir)) "
+				     "GROUP BY substr(user.email, 0, instr(user.email, '@')) "
+				     "ORDER BY cnt DESC, user.email "
+				     "LIMIT :limit;", selGetMaintainers))
+			return -1;
 
-			return 0;
-		}
+		return 0;
+	}
 
-		std::optional<SlSqlite::SQLConn::SelectResult>
-		get_maintainers(const std::string &file, const std::string &dir, int limit) const
-		{
-			SlSqlite::SQLConn::SelectResult res;
+	std::optional<SlSqlite::SQLConn::SelectResult>
+	get_maintainers(const std::string &file, const std::string &dir, int limit) const
+	{
+		SlSqlite::SQLConn::SelectResult res;
 
-			if (select(selGetMaintainers, {
-					{ ":file", file },
-					{ ":dir", dir },
-					{ ":limit", limit },
-					}, { typeid(std::string), typeid(int) }, res))
-				return {};
+		if (select(selGetMaintainers, {
+				{ ":file", file },
+				{ ":dir", dir },
+				{ ":limit", limit },
+				}, { typeid(std::string), typeid(int) }, res))
+			return {};
 
-			return res;
-		}
+		return res;
+	}
 
-		explicit operator bool() const { return sqlHolder.operator bool(); }
-	private:
-		SlSqlite::SQLStmtHolder selGetMaintainers;
-	};
+	explicit operator bool() const { return sqlHolder.operator bool(); }
+private:
+	SlSqlite::SQLStmtHolder selGetMaintainers;
+};
 
-	void parse_options(int argc, char **argv);
-	void show_emails(const Stanza &m, const std::string&);
-	void csv_output(const Stanza &m, const std::string&);
-	void json_output(const Stanza &m, const std::string&);
-	void show_people(const std::vector<Person> &, const std::string &, bool);
-	bool whois(const std::vector<Stanza> &, const std::string &);
-	bool grep(const std::vector<Stanza> &, const std::string &, bool);
-	bool fixes(const std::vector<Stanza> &, const std::string &, bool, bool, const CVEHashMap<ShaSize::Short> &, const CVE2Bugzilla &);
-	std::set<std::string> read_stdin_sans_new_lines();
-	template<typename F>
-	void for_all_stanzas(const SQLConn &db,
-			     const std::vector<Stanza> &,
-			     const std::vector<Stanza> &,
-			     const std::set<std::string> &,
-			     F pp,
-			     const std::string &);
+struct gm {
+	std::filesystem::path maintainers;
+	std::string kernel_tree;
+	std::string origin = "origin";
+	std::string cve_branch = "origin/master";
+	std::set<std::string> shas;
+	std::set<std::string> paths;
+	std::set<std::string> diffs;
+	std::string vulns;
+	std::string whois;
+	std::string grep;
+	std::string fixes;
+	std::string conf_file_map;
+	std::set<std::string> cves;
+	int year = 0;
+	bool rejected = false;
+	bool all_cves = false;
+	bool json = false;
+	bool csv = false;
+	bool names = false;
+	bool from_stdin = false;
+	bool trace = false;
+	bool refresh = false;
+	bool init = false;
+	bool no_translation = false;
+	bool only_maintainers = false;
+	bool no_db = false;
+	bool colors = false;
+} gm;
 
-	struct gm {
-		std::filesystem::path maintainers;
-		std::string kernel_tree;
-		std::string origin = "origin";
-		std::string cve_branch = "origin/master";
-		std::set<std::string> shas;
-		std::set<std::string> paths;
-		std::set<std::string> diffs;
-		std::string vulns;
-		std::string whois;
-		std::string grep;
-		std::string fixes;
-		std::string conf_file_map;
-		std::set<std::string> cves;
-		int year = 0;
-		bool rejected = false;
-		bool all_cves = false;
-		bool json = false;
-		bool csv = false;
-		bool names = false;
-		bool from_stdin = false;
-		bool trace = false;
-		bool refresh = false;
-		bool init = false;
-		bool no_translation = false;
-		bool only_maintainers = false;
-		bool no_db = false;
-		bool colors = false;
-	} gm;
+constexpr std::size_t tracking_fixes_opened_files = 64;
+constexpr std::size_t min_total_opened_files = 80;
+constexpr std::size_t libgit2_opened_files_factor = 2;
+static_assert(min_total_opened_files >= tracking_fixes_opened_files + libgit2_opened_files_factor);
 
-	constexpr std::size_t tracking_fixes_opened_files = 64;
-	constexpr std::size_t min_total_opened_files = 80;
-	constexpr std::size_t libgit2_opened_files_factor = 2;
-	static_assert(min_total_opened_files >= tracking_fixes_opened_files + libgit2_opened_files_factor);
+void usage(const char *prog, std::ostream &os)
+{
+	os << prog << " (version: " SUSE_GET_MAINTAINERS_VERSION ") For more information, read the man page.\n";
+	os << "  --help, -h                    - Print this help message\n";
+	os << "  --maintainers, -m <file>      - Custom path to the MAINTAINERS file instead of $HOME/.cache/suse-get-maintainers/MAINTAINERS\n";
+	os << "  --kernel_tree, -k <dir>       - Clone of the mainline kernel repo ($LINUX_GIT)\n";
+	os << "  --origin, -o <remote>         - Use some other remote than origin (useful only for $LINUX_GIT)\n";
+	os << "  --cve_branch, -b              - Which branch do we care about in $VULNS_GIT repository (by default origin/master)\n";
+	os << "  --vulns, -v <path>            - Path to the clone of https://git.kernel.org/pub/scm/linux/security/vulns.git ($VULNS_GIT)\n";
+	os << "  --sha, -s [<sha>|-]...        - SHA of a commit for which we want to find owners; - as stdin batch mode implies CSV output\n";
+	os << "                                  this option can be provided multiple times with different values\n";
+	os << "                                  SHA could be in shortened form of at least 12 characters\n";
+	os << "  --path, -p [<path>|-]...      - Path for which we want to find owners; - as stdin batch mode implies CSV output\n";
+	os << "                                  this option can be provided multiple times with different values\n";
+	os << "  --diff, -d [<path>|-]...      - Path to a patch we want to find owners; - as stdin batch mode implies CSV output\n";
+	os << "                                  this option can be provided multiple times with different values\n";
+	os << "  --cve, -c [<CVE number>|-]... - CVE number for which we want to find owners; - as stdin batch mode implies CSV output\n";
+	os << "                                  this option can be provided multiple times with different values\n";
+	os << "  --whois, -w [EMAIL|USERNAME]  - Look-up a maintainer and show his subsystems\n";
+	os << "  --grep, -g [REGEX]            - Grep maintainers (both emails and names) and subsystems and show the list of maintainer,subsystem for the matches; doesn't support -j yet\n";
+	os << "  --fixes, -f [REGEX]           - Grep maintainers (both emails and names) and subsystems and show the list of current fixes for the matches (EXPERIMENTAL)\n";
+	os << "  --all_cves, -C                - Resolve all kernel CVEs and find owners for them; CSV output; use -j or --json option for JSON\n";
+	os << "  --rejected, -R                - Query rejected CVEs instead of the published ones.  To be used with -c, -C and -y.\n";
+	os << "  --year, -y [year]             - Resolve all kernel CVEs from a given year; CSV output; use -j or --json option for JSON\n";
+	os << "  --refresh, -r                 - Refresh MAINTAINERS file and update (fetch origin) $VULNS_GIT and $LINUX_GIT if present\n";
+	os << "  --init, -i                    - Clone upstream repositories;  You need to provide at least -k or -v or both!\n";
+	os << "  --json, -j                    - Output JSON\n";
+	os << "  --csv, -S                     - Output CSV\n";
+	os << "  --colors_always, -a           - Always show colors; by default, they only show when the stdout is connected to the terminal\n";
+	os << "  --names, -n                   - Include full names with the emails; by default, just emails are extracted\n";
+	os << "  --no_translation, -N          - Do not translate to bugzilla emails\n";
+	os << "  --only_maintainers, -M        - Do not analyze the patches/commits; only MAINTAINERS files\n";
+	os << "  --no_db, -D                   - Do not fetch/process conf_file_map.sqlite db and therefore do not report backporters\n";
+	os << "  --trace, -t                   - Be a bit more verbose about how we got there on STDERR\n";
+	os << "  --version, -V                 - Print just the version number\n";
 }
+
+struct option opts[] = {
+	{ "help", no_argument, nullptr, 'h' },
+	{ "maintainers", required_argument, nullptr, 'm' },
+	{ "kernel_tree", required_argument, nullptr, 'k' },
+	{ "origin", required_argument, nullptr, 'o' },
+	{ "cve_branch", no_argument, nullptr, 'b' },
+	{ "sha", required_argument, nullptr, 's' },
+	{ "path", required_argument, nullptr, 'p' },
+	{ "diff", required_argument, nullptr, 'd' },
+	{ "vulns", required_argument, nullptr, 'v' },
+	{ "cve", required_argument, nullptr, 'c' },
+	{ "whois", required_argument, nullptr, 'w' },
+	{ "grep", required_argument, nullptr, 'g' },
+	{ "fixes", required_argument, nullptr, 'f' },
+	{ "rejected", no_argument, nullptr, 'R' },
+	{ "all_cves", no_argument, nullptr, 'C' },
+	{ "year", required_argument, nullptr, 'y' },
+	{ "refresh", no_argument, nullptr, 'r' },
+	{ "init", no_argument, nullptr, 'i' },
+	{ "json", no_argument, nullptr, 'j' },
+	{ "csv", no_argument, nullptr, 'S' },
+	{ "colors_always", no_argument, nullptr, 'a' },
+	{ "names", no_argument, nullptr, 'n' },
+	{ "trace", no_argument, nullptr, 't' },
+	{ "no_translation", no_argument, nullptr, 'N' },
+	{ "only_maintainers", no_argument, nullptr, 'M' },
+	{ "no_db", no_argument, nullptr, 'D' },
+	{ "version", no_argument, nullptr, 'V' },
+	{ nullptr, 0, nullptr, 0 },
+};
+
+void parse_options(int argc, char **argv)
+{
+	int c;
+	std::string option;
+
+	for (;;) {
+		int opt_idx;
+
+		c = getopt_long(argc, argv, "hm:k:o:b:s:p:d:v:c:w:g:f:CRy:rijSantNMDV", opts, &opt_idx);
+		if (c == -1)
+			break;
+
+		switch (c) {
+		case 'h':
+			usage(argv[0], std::cout);
+			throw 0;
+		case 'm':
+			gm.maintainers = optarg;
+			break;
+		case 'k':
+			gm.kernel_tree = optarg;
+			break;
+		case 'o':
+			gm.origin = optarg;
+			break;
+		case 'b':
+			gm.cve_branch = optarg;
+			break;
+		case 's':
+			option = optarg;
+			if (option == "-")
+				gm.from_stdin = true;
+			gm.shas.insert(option);
+			break;
+		case 'p':
+			option = optarg;
+			if (option == "-")
+				gm.from_stdin = true;
+			gm.paths.insert(option);
+			break;
+		case 'd':
+			option = optarg;
+			if (option == "-")
+				gm.from_stdin = true;
+			gm.diffs.insert(option);
+			break;
+		case 'v':
+			gm.vulns = optarg;
+			break;
+		case 'c':
+			option = optarg;
+			if (option == "-")
+				gm.from_stdin = true;
+			gm.cves.insert(option);
+			break;
+		case 'w':
+			gm.whois = optarg;
+			break;
+		case 'g':
+			gm.grep = optarg;
+			break;
+		case 'f':
+			gm.fixes = optarg;
+			break;
+		case 'C':
+			gm.all_cves = true;
+			break;
+		case 'R':
+			gm.rejected = true;
+			break;
+		case 'y':
+			gm.year = atoi(optarg);
+			if (gm.year < 1999 || gm.year > 9999)
+				fail_with_message(optarg, " is a year that doesn't make sense for CVE!");
+			gm.all_cves = true;
+			break;
+		case 'r':
+			gm.refresh = true;
+			break;
+		case 'i':
+			gm.init = true;
+			break;
+		case 'j':
+			gm.json = true;
+			break;
+		case 'S':
+			gm.csv = true;
+			break;
+		case 'a':
+			gm.colors = true;
+			break;
+		case 'n':
+			gm.names = true;
+			break;
+		case 't':
+			gm.trace = true;
+			break;
+		case 'N':
+			gm.no_translation = true;
+			// TODO
+			do_not_translate = true;
+			// END TODO
+			break;
+		case 'M':
+			gm.only_maintainers = true;
+			break;
+		case 'D':
+			gm.no_db = true;
+			break;
+		case 'V':
+			std::cout << SUSE_GET_MAINTAINERS_VERSION << '\n';
+			throw 0;
+		default:
+			usage(argv[0], std::cerr);
+			throw 1;
+		}
+	}
+}
+
+void show_emails(const Stanza &m, const std::string &)
+{
+	m.for_all_maintainers([](const Person &p) {
+		if (gm.names && !p.name.empty())
+			std::cout << p.name << " <" << p.email << ">\n";
+		else
+			std::cout << p.email << '\n';
+	});
+}
+
+void csv_output(const Stanza &m, const std::string &what)
+{
+	std::cout << what << ',' << '"' << m.name << '"';
+	m.for_all_maintainers([](const Person &p) {
+		if (gm.names && !p.name.empty())
+			std::cout << "," << p.name << " <" << p.email << ">";
+		else
+			std::cout << "," << p.email;
+	});
+	std::cout << '\n';
+}
+
+void json_output(const Stanza &m, const std::string &what)
+{
+	std::cout << what << ',' << "\n    " << color_format(gm.colors, T_BLUE, "\"subsystem\"") << ": " <<
+		color_format(gm.colors, T_GREEN, std::quoted(m.name)) << ",\n    " << color_format(gm.colors, T_BLUE, "\"emails\"") << ": [\n      ";
+	bool first = true;
+	int backport_counts = 0;
+	m.for_all_maintainers([&first, &backport_counts](const Person &p) {
+		backport_counts += p.count;
+		if (!first)
+			std::cout << ",\n      ";
+		first = false;
+		const std::string who = gm.names && !p.name.empty() ? p.name + " <" + p.email + ">" : p.email;
+		std::cout << color_format(gm.colors, T_GREEN, std::quoted(who));
+	});
+	if (backport_counts > 0) {
+		std::cout << "\n    ],\n    " << color_format(gm.colors, T_BLUE, "\"counts\"") << ": [\n      ";
+		first = true;
+		m.for_all_maintainers([&first](const Person &p) {
+			if (!first)
+				std::cout << ",\n      ";
+			first = false;
+			std::cout << color_format(gm.colors, T_GREEN, p.count);
+		});
+	}
+	std::cout << "\n    ]\n  }";
+}
+
+void show_people(const std::vector<Person> &sb, const std::string &what, bool simple)
+{
+
+	if (simple) {
+		std::set<std::string> duplicate_set;
+		for (const Person &p: sb) {
+			std::string tmp_email = translate_email(p.email); // TODO
+			if (duplicate_set.contains(tmp_email))
+				continue;
+			duplicate_set.insert(tmp_email);
+			if (gm.names)
+				std::cout << p.name << " <";
+			std::cout << tmp_email; // TODO
+			if (gm.names)
+				std::cout << ">";
+			std::cout << '\n';
+		}
+	} else if (gm.json) {
+		std::cout << what << ',' << "\n    " << color_format(gm.colors, T_BLUE, "\"roles\"") << ": [\n      ";
+		bool first = true;
+		int backport_counts = 0;
+		for (const Person &p: sb) {
+			backport_counts += p.count;
+			if (!first)
+				std::cout << ",\n      ";
+			first = false;
+			std::cout << color_format(gm.colors, T_GREEN, std::quoted(to_string(p.role)));
+		}
+		std::cout << "\n    ],\n    " << color_format(gm.colors, T_BLUE, "\"emails\"") << ": [\n      ";
+		first = true;
+		for (const Person &p: sb) {
+			if (!first)
+				std::cout << ",\n      ";
+			first = false;
+			const std::string tmp_email = translate_email(p.email); // TODO
+			const std::string who = gm.names && !p.name.empty() ? p.name + " <" + tmp_email + ">" : tmp_email;
+			std::cout << color_format(gm.colors, T_GREEN, std::quoted(who));
+		}
+		if (backport_counts > 0) {
+			std::cout << "\n    ],\n    " << color_format(gm.colors, T_BLUE, "\"counts\"") << ": [\n      ";
+			first = true;
+			for (const Person &p: sb) {
+				if (!first)
+					std::cout << ",\n      ";
+				first = false;
+				std::cout << color_format(gm.colors, T_GREEN, p.count);
+			}
+		}
+		std::cout << "\n    ]\n  }";
+	} else {
+		std::cout << what << ',' << '"';
+		bool first = true;
+		for (const Person &p: sb) {
+			if (!first)
+				std::cout << '/';
+			first = false;
+			std::cout << to_string(p.role);
+		}
+		std::cout << '"' << ',';
+		first = true;
+		for (const Person &p: sb) {
+			if (!first)
+				std::cout << ',';
+			first = false;
+			std::string tmp_email = translate_email(p.email); // TODO
+			if (gm.names)
+				std::cout << p.name << " <";
+			std::cout << tmp_email; // TODO
+			if (gm.names)
+				std::cout << ">";
+		}
+		std::cout << '\n';
+	}
+}
+
+bool whois(const std::vector<Stanza> &stanzas, const std::string &whois)
+{
+	bool found = false;
+	for (const auto& s: stanzas) {
+		s.for_all_maintainers([&s, &whois, &found](const Person &p) {
+			if (p.email == whois || p.email.starts_with(whois + "@")) {
+				std::cout << s.name << "\n";
+				found = true;
+			}
+		});
+	}
+	return found;
+}
+
+bool grep(const std::vector<Stanza> &stanzas, const std::string &grep, bool names)
+{
+	const auto re = std::regex(grep, std::regex::icase | std::regex::optimize);
+	bool found = false;
+	for (const auto& s: stanzas) {
+		s.for_all_maintainers([&re, &s, &grep, &found, names](const Person &p) {
+			try {
+				std::smatch email_match, name_match, subsystem_match;
+				std::regex_search(p.email, email_match, re);
+				std::regex_search(p.name, name_match, re);
+				std::regex_search(s.name, subsystem_match, re);
+				if (!email_match.empty() || !name_match.empty() || !subsystem_match.empty()) {
+					if (names)
+						std::cout << '"' << p.name << " <" << p.email << ">\"";
+					else
+						std::cout << p.email;
+					std::cout << ",\"" << s.name << "\"\n";
+					found = true;
+				}
+			} catch (const std::regex_error& e) {
+				fail_with_message(grep + ": " + e.what());
+			}
+		});
+	}
+	return found;
+}
+
+bool fixes(const std::vector<Stanza> &stanzas, const std::string &grep, bool csv, bool trace, const CVEHashMap<ShaSize::Short> &cve_hash_map, const CVE2Bugzilla &cve_to_bugzilla)
+{
+	const auto re = std::regex(grep, std::regex::icase | std::regex::optimize);
+	bool found = false;
+	std::set<std::string> files;
+	for (const auto& s: stanzas) {
+		s.for_all_maintainers([&re, &s, &grep, &found, &files](const Person &p) {
+			try {
+				std::smatch email_match, name_match, subsystem_match;
+				std::regex_search(p.email, email_match, re);
+				std::regex_search(p.name, name_match, re);
+				std::regex_search(s.name, subsystem_match, re);
+				if (!email_match.empty() || !name_match.empty() || !subsystem_match.empty()) {
+					files.insert(maintainer_file_name_from_subsystem(s.name));
+					found = true;
+				}
+			} catch (const std::regex_error& e) {
+				fail_with_message(grep + ": " + e.what());
+			}
+		});
+	}
+	for (const auto &mf: files) {
+		auto mf_on_the_disk = fetch_file_if_needed({}, mf, "http://fixes.prg2.suse.org/current/" + mf, trace, false, true, std::chrono::hours{12});
+		if (csv)
+			std::cout << "commit,subsys-part,sle-versions,bsc,cve\n";
+		else
+			std::cout << "--------------------------------------------------------------------------------\n";
+		if (!mf_on_the_disk.empty()) {
+			if (trace)
+				emit_message(mf_on_the_disk);
+			std::ifstream file{mf_on_the_disk};
+			if (!file.is_open())
+				fail_with_message("Unable to open file: ", mf_on_the_disk);
+			enum {
+				commit, subsys, sle_version, bsc, cve, last
+			};
+			std::string csv_details[last];
+			for (std::string line; getline(file, line);) {
+				std::string possible_cve;
+
+				auto line_not_hex_to_csv = [&csv_details, &line]() {
+					std::istringstream line_iss(line);
+					std::string considered, for_, version_;
+					line_iss >> considered >> for_ >> version_;
+					if(considered == "Considered" && for_ == "for") {
+						if (csv_details[sle_version] != "")
+							csv_details[sle_version] += ";";
+						csv_details[sle_version] += version_;
+					} else if (line.length() == 0 && csv_details[commit] != "") {
+						std::cout << csv_details[commit] << ","
+									<< csv_details[subsys] << ","
+									<< csv_details[sle_version] << ","
+									<< csv_details[bsc] << ","
+									<< csv_details[cve]
+									<< '\n';
+						std::fill_n(csv_details, last, "");
+					}
+				};
+
+				auto line_is_hex_to_csv = [&csv_details, &possible_cve, &line, &cve_to_bugzilla]() {
+					const auto last_col = line.rfind(": ");
+					if (last_col != std::string::npos) {
+						csv_details[subsys] = line.substr(13, last_col - 13);
+						const std::string replace_chars = ",;()[]{}";
+						for (size_t loc; (loc = csv_details[subsys].find_first_of(replace_chars)) != std::string::npos;)
+							csv_details[subsys] = csv_details[subsys].replace(loc, 1, "");
+						for (size_t loc; (loc = csv_details[subsys].find(": ")) != std::string::npos;)
+							csv_details[subsys] = csv_details[subsys].replace(loc, 2, ";");
+					}
+
+					if (!possible_cve.empty()) {
+						csv_details[cve] = possible_cve;
+
+						const std::string possible_bsc = cve_to_bugzilla.get_bsc(possible_cve);
+						if (!possible_bsc.empty())
+							csv_details[bsc] = possible_bsc.substr(4);
+					}
+				};
+
+				const auto possible_sha = (line.size() > 13 && line[12] == ' ') ? line.substr(0, 12) : "nope";
+				if (is_hex(possible_sha)) {
+					possible_cve = cve_hash_map.get_cve(possible_sha);
+					csv_details[commit] = possible_sha;
+				} else if (csv) {
+					line_not_hex_to_csv();
+					continue;
+				}
+				if (csv) {
+					line_is_hex_to_csv();
+				} else {
+					std::cout << line << '\n';
+					if (!possible_cve.empty()) {
+						std::cout << "        " << possible_cve;
+						const std::string possible_bsc = cve_to_bugzilla.get_bsc(possible_cve);
+						if (!possible_bsc.empty())
+							std::cout << " https://bugzilla.suse.com/show_bug.cgi?id=" << possible_bsc.substr(4) << '\n';
+					}
+				}
+			}
+			if (csv)
+				std::cout << "\n";
+		} else
+			std::cout << "No fixes for " << mf << ".\n";
+	}
+	return found;
+}
+
+std::set<std::string> read_stdin_sans_new_lines()
+{
+	std::set<std::string> ret;
+
+	for (std::string line; std::getline(std::cin, line);)
+		ret.insert(std::string(trim(line)));
+
+	return ret;
+}
+
+std::optional<const Stanza *> find_best_match(const std::vector<Stanza> &sl, const std::set<std::string> &paths)
+{
+	std::optional<const Stanza *> ret;
+	unsigned best_weight = 0;
+	for(const auto &s: sl) {
+		unsigned weight = 0;
+		for (const auto &path: paths)
+			weight += s.match_path(path);
+		if (weight > best_weight) {
+			ret.emplace(&s);
+			best_weight = weight;
+		}
+	}
+	return ret;
+}
+
+struct GetMaintainers
+{
+	std::string email;
+	int count;
+};
+
+template<typename F>
+void for_all_stanzas(const SQLConn &db,
+		     const std::vector<Stanza> &suse_stanzas,
+		     const std::vector<Stanza> &upstream_stanzas,
+		     const std::set<std::string> &paths,
+		     F pp,
+		     const std::string &what)
+{
+	std::optional<const Stanza *> stanza = find_best_match(suse_stanzas, paths);
+
+	if (stanza.has_value()) {
+		if (gm.trace)
+			std::cerr << "STANZA: " << stanza.value()->name << std::endl;
+		pp(*stanza.value(), what);
+		return;
+	}
+
+	stanza = find_best_match(upstream_stanzas, paths);
+
+	if (stanza.has_value()) {
+		if (gm.trace)
+			std::cerr << "Upstream STANZA: " << stanza.value()->name << std::endl;
+		pp(*stanza.value(), what);
+		return;
+	}
+
+	if (db) {
+		std::unordered_map<std::string, int> emails_and_counts_m;
+		for (const std::string &p: paths) {
+			const std::filesystem::path path(p);
+			const std::string dir = path.parent_path(), file = path.filename();
+
+			auto mOpt = db.get_maintainers(file, dir, 4);
+			if (!mOpt)
+				fail_with_message("Failed to query.");
+			for (auto &m : *mOpt) {
+				const auto email = std::move(std::get<std::string>(m[0]));
+				const auto count = std::get<int>(m[1]);
+				emails_and_counts_m[email] += count;
+			}
+		}
+		if (!emails_and_counts_m.empty()) {
+			struct GetMaintainers
+			{
+				std::string email;
+				int count;
+			};
+
+			std::vector<GetMaintainers> emails_and_counts_v;
+			for (const auto &e: emails_and_counts_m)
+				emails_and_counts_v.push_back(GetMaintainers(std::move(e.first), e.second));
+			std::sort(emails_and_counts_v.begin(), emails_and_counts_v.end(), [](const GetMaintainers &a, const GetMaintainers &b) {
+				return a.count > b.count;
+			});
+			Stanza s;
+			s.name = "Backporter";
+			for (const auto &e: emails_and_counts_v)
+				s.add_backporter("M: Backporter <" + e.email + ">", e.count);
+			if (gm.trace)
+				std::cerr << "Backporters:" << std::endl;
+			pp(s, what);
+			return;
+		}
+	}
+
+	thread_local auto catch_all_maintainer = Stanza{"Base", "F: Kernel Developers at SuSE <kernel@suse.de>"};
+	if (gm.trace)
+		std::cerr << "STANZA: " << catch_all_maintainer.name << std::endl;
+	pp(catch_all_maintainer, what);
+}
+
+} // namespace
 
 int main(int argc, char **argv)
 {
@@ -384,569 +930,4 @@ int main(int argc, char **argv)
 	}
 
 	SGM_END;
-}
-
-namespace {
-
-	void usage(const char *prog, std::ostream &os)
-	{
-		os << prog << " (version: " SUSE_GET_MAINTAINERS_VERSION ") For more information, read the man page.\n";
-		os << "  --help, -h                    - Print this help message\n";
-		os << "  --maintainers, -m <file>      - Custom path to the MAINTAINERS file instead of $HOME/.cache/suse-get-maintainers/MAINTAINERS\n";
-		os << "  --kernel_tree, -k <dir>       - Clone of the mainline kernel repo ($LINUX_GIT)\n";
-		os << "  --origin, -o <remote>         - Use some other remote than origin (useful only for $LINUX_GIT)\n";
-		os << "  --cve_branch, -b              - Which branch do we care about in $VULNS_GIT repository (by default origin/master)\n";
-		os << "  --vulns, -v <path>            - Path to the clone of https://git.kernel.org/pub/scm/linux/security/vulns.git ($VULNS_GIT)\n";
-		os << "  --sha, -s [<sha>|-]...        - SHA of a commit for which we want to find owners; - as stdin batch mode implies CSV output\n";
-		os << "                                  this option can be provided multiple times with different values\n";
-		os << "                                  SHA could be in shortened form of at least 12 characters\n";
-		os << "  --path, -p [<path>|-]...      - Path for which we want to find owners; - as stdin batch mode implies CSV output\n";
-		os << "                                  this option can be provided multiple times with different values\n";
-		os << "  --diff, -d [<path>|-]...      - Path to a patch we want to find owners; - as stdin batch mode implies CSV output\n";
-		os << "                                  this option can be provided multiple times with different values\n";
-		os << "  --cve, -c [<CVE number>|-]... - CVE number for which we want to find owners; - as stdin batch mode implies CSV output\n";
-		os << "                                  this option can be provided multiple times with different values\n";
-		os << "  --whois, -w [EMAIL|USERNAME]  - Look-up a maintainer and show his subsystems\n";
-		os << "  --grep, -g [REGEX]            - Grep maintainers (both emails and names) and subsystems and show the list of maintainer,subsystem for the matches; doesn't support -j yet\n";
-		os << "  --fixes, -f [REGEX]           - Grep maintainers (both emails and names) and subsystems and show the list of current fixes for the matches (EXPERIMENTAL)\n";
-		os << "  --all_cves, -C                - Resolve all kernel CVEs and find owners for them; CSV output; use -j or --json option for JSON\n";
-		os << "  --rejected, -R                - Query rejected CVEs instead of the published ones.  To be used with -c, -C and -y.\n";
-		os << "  --year, -y [year]             - Resolve all kernel CVEs from a given year; CSV output; use -j or --json option for JSON\n";
-		os << "  --refresh, -r                 - Refresh MAINTAINERS file and update (fetch origin) $VULNS_GIT and $LINUX_GIT if present\n";
-		os << "  --init, -i                    - Clone upstream repositories;  You need to provide at least -k or -v or both!\n";
-		os << "  --json, -j                    - Output JSON\n";
-		os << "  --csv, -S                     - Output CSV\n";
-		os << "  --colors_always, -a           - Always show colors; by default, they only show when the stdout is connected to the terminal\n";
-		os << "  --names, -n                   - Include full names with the emails; by default, just emails are extracted\n";
-		os << "  --no_translation, -N          - Do not translate to bugzilla emails\n";
-		os << "  --only_maintainers, -M        - Do not analyze the patches/commits; only MAINTAINERS files\n";
-		os << "  --no_db, -D                   - Do not fetch/process conf_file_map.sqlite db and therefore do not report backporters\n";
-		os << "  --trace, -t                   - Be a bit more verbose about how we got there on STDERR\n";
-		os << "  --version, -V                 - Print just the version number\n";
-	}
-
-	struct option opts[] = {
-		{ "help", no_argument, nullptr, 'h' },
-		{ "maintainers", required_argument, nullptr, 'm' },
-		{ "kernel_tree", required_argument, nullptr, 'k' },
-		{ "origin", required_argument, nullptr, 'o' },
-		{ "cve_branch", no_argument, nullptr, 'b' },
-		{ "sha", required_argument, nullptr, 's' },
-		{ "path", required_argument, nullptr, 'p' },
-		{ "diff", required_argument, nullptr, 'd' },
-		{ "vulns", required_argument, nullptr, 'v' },
-		{ "cve", required_argument, nullptr, 'c' },
-		{ "whois", required_argument, nullptr, 'w' },
-		{ "grep", required_argument, nullptr, 'g' },
-		{ "fixes", required_argument, nullptr, 'f' },
-		{ "rejected", no_argument, nullptr, 'R' },
-		{ "all_cves", no_argument, nullptr, 'C' },
-		{ "year", required_argument, nullptr, 'y' },
-		{ "refresh", no_argument, nullptr, 'r' },
-		{ "init", no_argument, nullptr, 'i' },
-		{ "json", no_argument, nullptr, 'j' },
-		{ "csv", no_argument, nullptr, 'S' },
-		{ "colors_always", no_argument, nullptr, 'a' },
-		{ "names", no_argument, nullptr, 'n' },
-		{ "trace", no_argument, nullptr, 't' },
-		{ "no_translation", no_argument, nullptr, 'N' },
-		{ "only_maintainers", no_argument, nullptr, 'M' },
-		{ "no_db", no_argument, nullptr, 'D' },
-		{ "version", no_argument, nullptr, 'V' },
-		{ nullptr, 0, nullptr, 0 },
-	};
-
-	void parse_options(int argc, char **argv)
-	{
-		int c;
-		std::string option;
-
-		for (;;) {
-			int opt_idx;
-
-			c = getopt_long(argc, argv, "hm:k:o:b:s:p:d:v:c:w:g:f:CRy:rijSantNMDV", opts, &opt_idx);
-			if (c == -1)
-				break;
-
-			switch (c) {
-			case 'h':
-				usage(argv[0], std::cout);
-				throw 0;
-			case 'm':
-				gm.maintainers = optarg;
-				break;
-			case 'k':
-				gm.kernel_tree = optarg;
-				break;
-			case 'o':
-				gm.origin = optarg;
-				break;
-			case 'b':
-				gm.cve_branch = optarg;
-				break;
-			case 's':
-				option = optarg;
-				if (option == "-")
-					gm.from_stdin = true;
-				gm.shas.insert(option);
-				break;
-			case 'p':
-				option = optarg;
-				if (option == "-")
-					gm.from_stdin = true;
-				gm.paths.insert(option);
-				break;
-			case 'd':
-				option = optarg;
-				if (option == "-")
-					gm.from_stdin = true;
-				gm.diffs.insert(option);
-				break;
-			case 'v':
-				gm.vulns = optarg;
-				break;
-			case 'c':
-				option = optarg;
-				if (option == "-")
-					gm.from_stdin = true;
-				gm.cves.insert(option);
-				break;
-			case 'w':
-				gm.whois = optarg;
-				break;
-			case 'g':
-				gm.grep = optarg;
-				break;
-			case 'f':
-				gm.fixes = optarg;
-				break;
-			case 'C':
-				gm.all_cves = true;
-				break;
-			case 'R':
-				gm.rejected = true;
-				break;
-			case 'y':
-				gm.year = atoi(optarg);
-				if (gm.year < 1999 || gm.year > 9999)
-					fail_with_message(optarg, " is a year that doesn't make sense for CVE!");
-				gm.all_cves = true;
-				break;
-			case 'r':
-				gm.refresh = true;
-				break;
-			case 'i':
-				gm.init = true;
-				break;
-			case 'j':
-				gm.json = true;
-				break;
-			case 'S':
-				gm.csv = true;
-				break;
-			case 'a':
-				gm.colors = true;
-				break;
-			case 'n':
-				gm.names = true;
-				break;
-			case 't':
-				gm.trace = true;
-				break;
-			case 'N':
-				gm.no_translation = true;
-				// TODO
-				do_not_translate = true;
-				// END TODO
-				break;
-			case 'M':
-				gm.only_maintainers = true;
-				break;
-			case 'D':
-				gm.no_db = true;
-				break;
-			case 'V':
-				std::cout << SUSE_GET_MAINTAINERS_VERSION << '\n';
-				throw 0;
-			default:
-				usage(argv[0], std::cerr);
-				throw 1;
-			}
-		}
-	}
-
-	void show_emails(const Stanza &m, const std::string &)
-	{
-		m.for_all_maintainers([](const Person &p) {
-			if (gm.names && !p.name.empty())
-				std::cout << p.name << " <" << p.email << ">\n";
-			else
-				std::cout << p.email << '\n';
-		});
-	}
-
-	void csv_output(const Stanza &m, const std::string &what)
-	{
-		std::cout << what << ',' << '"' << m.name << '"';
-		m.for_all_maintainers([](const Person &p) {
-			if (gm.names && !p.name.empty())
-				std::cout << "," << p.name << " <" << p.email << ">";
-			else
-				std::cout << "," << p.email;
-		});
-		std::cout << '\n';
-	}
-
-	void json_output(const Stanza &m, const std::string &what)
-	{
-		std::cout << what << ',' << "\n    " << color_format(gm.colors, T_BLUE, "\"subsystem\"") << ": " <<
-			color_format(gm.colors, T_GREEN, std::quoted(m.name)) << ",\n    " << color_format(gm.colors, T_BLUE, "\"emails\"") << ": [\n      ";
-		bool first = true;
-		int backport_counts = 0;
-		m.for_all_maintainers([&first, &backport_counts](const Person &p) {
-			backport_counts += p.count;
-			if (!first)
-				std::cout << ",\n      ";
-			first = false;
-			const std::string who = gm.names && !p.name.empty() ? p.name + " <" + p.email + ">" : p.email;
-			std::cout << color_format(gm.colors, T_GREEN, std::quoted(who));
-		});
-		if (backport_counts > 0) {
-			std::cout << "\n    ],\n    " << color_format(gm.colors, T_BLUE, "\"counts\"") << ": [\n      ";
-			first = true;
-			m.for_all_maintainers([&first](const Person &p) {
-				if (!first)
-					std::cout << ",\n      ";
-				first = false;
-				std::cout << color_format(gm.colors, T_GREEN, p.count);
-			});
-		}
-		std::cout << "\n    ]\n  }";
-	}
-
-	void show_people(const std::vector<Person> &sb, const std::string &what, bool simple)
-	{
-
-		if (simple) {
-			std::set<std::string> duplicate_set;
-			for (const Person &p: sb) {
-				std::string tmp_email = translate_email(p.email); // TODO
-				if (duplicate_set.contains(tmp_email))
-					continue;
-				duplicate_set.insert(tmp_email);
-				if (gm.names)
-					std::cout << p.name << " <";
-				std::cout << tmp_email; // TODO
-				if (gm.names)
-					std::cout << ">";
-				std::cout << '\n';
-			}
-		} else if (gm.json) {
-			std::cout << what << ',' << "\n    " << color_format(gm.colors, T_BLUE, "\"roles\"") << ": [\n      ";
-			bool first = true;
-			int backport_counts = 0;
-			for (const Person &p: sb) {
-				backport_counts += p.count;
-				if (!first)
-					std::cout << ",\n      ";
-				first = false;
-                                std::cout << color_format(gm.colors, T_GREEN, std::quoted(to_string(p.role)));
-			}
-			std::cout << "\n    ],\n    " << color_format(gm.colors, T_BLUE, "\"emails\"") << ": [\n      ";
-			first = true;
-			for (const Person &p: sb) {
-				if (!first)
-					std::cout << ",\n      ";
-				first = false;
-				const std::string tmp_email = translate_email(p.email); // TODO
-				const std::string who = gm.names && !p.name.empty() ? p.name + " <" + tmp_email + ">" : tmp_email;
-				std::cout << color_format(gm.colors, T_GREEN, std::quoted(who));
-			}
-			if (backport_counts > 0) {
-				std::cout << "\n    ],\n    " << color_format(gm.colors, T_BLUE, "\"counts\"") << ": [\n      ";
-				first = true;
-				for (const Person &p: sb) {
-					if (!first)
-						std::cout << ",\n      ";
-					first = false;
-					std::cout << color_format(gm.colors, T_GREEN, p.count);
-				}
-			}
-			std::cout << "\n    ]\n  }";
-		} else {
-			std::cout << what << ',' << '"';
-			bool first = true;
-			for (const Person &p: sb) {
-				if (!first)
-					std::cout << '/';
-				first = false;
-				std::cout << to_string(p.role);
-			}
-			std::cout << '"' << ',';
-			first = true;
-			for (const Person &p: sb) {
-				if (!first)
-					std::cout << ',';
-				first = false;
-				std::string tmp_email = translate_email(p.email); // TODO
-				if (gm.names)
-					std::cout << p.name << " <";
-				std::cout << tmp_email; // TODO
-				if (gm.names)
-					std::cout << ">";
-			}
-			std::cout << '\n';
-		}
-	}
-
-	bool whois(const std::vector<Stanza> &stanzas, const std::string &whois)
-	{
-		bool found = false;
-		for (const auto& s: stanzas) {
-			s.for_all_maintainers([&s, &whois, &found](const Person &p) {
-				if (p.email == whois || p.email.starts_with(whois + "@")) {
-					std::cout << s.name << "\n";
-					found = true;
-				}
-			});
-		}
-		return found;
-	}
-
-	bool grep(const std::vector<Stanza> &stanzas, const std::string &grep, bool names)
-	{
-		const auto re = std::regex(grep, std::regex::icase | std::regex::optimize);
-		bool found = false;
-		for (const auto& s: stanzas) {
-			s.for_all_maintainers([&re, &s, &grep, &found, names](const Person &p) {
-				try {
-					std::smatch email_match, name_match, subsystem_match;
-					std::regex_search(p.email, email_match, re);
-					std::regex_search(p.name, name_match, re);
-					std::regex_search(s.name, subsystem_match, re);
-					if (!email_match.empty() || !name_match.empty() || !subsystem_match.empty()) {
-						if (names)
-							std::cout << '"' << p.name << " <" << p.email << ">\"";
-						else
-							std::cout << p.email;
-						std::cout << ",\"" << s.name << "\"\n";
-						found = true;
-					}
-				} catch (const std::regex_error& e) {
-					fail_with_message(grep + ": " + e.what());
-				}
-			});
-		}
-		return found;
-	}
-
-	bool fixes(const std::vector<Stanza> &stanzas, const std::string &grep, bool csv, bool trace, const CVEHashMap<ShaSize::Short> &cve_hash_map, const CVE2Bugzilla &cve_to_bugzilla)
-	{
-		const auto re = std::regex(grep, std::regex::icase | std::regex::optimize);
-		bool found = false;
-		std::set<std::string> files;
-		for (const auto& s: stanzas) {
-			s.for_all_maintainers([&re, &s, &grep, &found, &files](const Person &p) {
-				try {
-					std::smatch email_match, name_match, subsystem_match;
-					std::regex_search(p.email, email_match, re);
-					std::regex_search(p.name, name_match, re);
-					std::regex_search(s.name, subsystem_match, re);
-					if (!email_match.empty() || !name_match.empty() || !subsystem_match.empty()) {
-						files.insert(maintainer_file_name_from_subsystem(s.name));
-						found = true;
-					}
-				} catch (const std::regex_error& e) {
-					fail_with_message(grep + ": " + e.what());
-				}
-			});
-		}
-		for (const auto &mf: files) {
-			auto mf_on_the_disk = fetch_file_if_needed({}, mf, "http://fixes.prg2.suse.org/current/" + mf, trace, false, true, std::chrono::hours{12});
-			if (csv)
-				std::cout << "commit,subsys-part,sle-versions,bsc,cve\n";
-			else
-				std::cout << "--------------------------------------------------------------------------------\n";
-			if (!mf_on_the_disk.empty()) {
-				if (trace)
-					emit_message(mf_on_the_disk);
-				std::ifstream file{mf_on_the_disk};
-				if (!file.is_open())
-					fail_with_message("Unable to open file: ", mf_on_the_disk);
-				enum {
-					commit, subsys, sle_version, bsc, cve, last
-				};
-				std::string csv_details[last];
-				for (std::string line; getline(file, line);) {
-					std::string possible_cve;
-
-					auto line_not_hex_to_csv = [&csv_details, &line]() {
-						std::istringstream line_iss(line);
-						std::string considered, for_, version_;
-						line_iss >> considered >> for_ >> version_;
-						if(considered == "Considered" && for_ == "for") {
-							if (csv_details[sle_version] != "")
-								csv_details[sle_version] += ";";
-							csv_details[sle_version] += version_;
-						} else if (line.length() == 0 && csv_details[commit] != "") {
-							std::cout << csv_details[commit] << ","
-										<< csv_details[subsys] << ","
-										<< csv_details[sle_version] << ","
-										<< csv_details[bsc] << ","
-										<< csv_details[cve]
-										<< '\n';
-							std::fill_n(csv_details, last, "");
-						}
-					};
-
-					auto line_is_hex_to_csv = [&csv_details, &possible_cve, &line, &cve_to_bugzilla]() {
-						const auto last_col = line.rfind(": ");
-						if (last_col != std::string::npos) {
-							csv_details[subsys] = line.substr(13, last_col - 13);
-							const std::string replace_chars = ",;()[]{}";
-							for (size_t loc; (loc = csv_details[subsys].find_first_of(replace_chars)) != std::string::npos;)
-								csv_details[subsys] = csv_details[subsys].replace(loc, 1, "");
-							for (size_t loc; (loc = csv_details[subsys].find(": ")) != std::string::npos;)
-								csv_details[subsys] = csv_details[subsys].replace(loc, 2, ";");
-						}
-
-						if (!possible_cve.empty()) {
-							csv_details[cve] = possible_cve;
-
-							const std::string possible_bsc = cve_to_bugzilla.get_bsc(possible_cve);
-							if (!possible_bsc.empty())
-								csv_details[bsc] = possible_bsc.substr(4);
-						}
-					};
-
-					const auto possible_sha = (line.size() > 13 && line[12] == ' ') ? line.substr(0, 12) : "nope";
-					if (is_hex(possible_sha)) {
-						possible_cve = cve_hash_map.get_cve(possible_sha);
-						csv_details[commit] = possible_sha;
-					} else if (csv) {
-						line_not_hex_to_csv();
-						continue;
-					}
-					if (csv) {
-						line_is_hex_to_csv();
-					} else {
-						std::cout << line << '\n';
-						if (!possible_cve.empty()) {
-							std::cout << "        " << possible_cve;
-							const std::string possible_bsc = cve_to_bugzilla.get_bsc(possible_cve);
-							if (!possible_bsc.empty())
-								std::cout << " https://bugzilla.suse.com/show_bug.cgi?id=" << possible_bsc.substr(4) << '\n';
-						}
-					}
-				}
-				if (csv)
-					std::cout << "\n";
-			} else
-				std::cout << "No fixes for " << mf << ".\n";
-		}
-		return found;
-	}
-
-	std::set<std::string> read_stdin_sans_new_lines()
-	{
-		std::set<std::string> ret;
-
-		for (std::string line; std::getline(std::cin, line);)
-			ret.insert(std::string(trim(line)));
-
-		return ret;
-	}
-
-	std::optional<const Stanza *> find_best_match(const std::vector<Stanza> &sl, const std::set<std::string> &paths)
-	{
-		std::optional<const Stanza *> ret;
-		unsigned best_weight = 0;
-		for(const auto &s: sl) {
-			unsigned weight = 0;
-			for (const auto &path: paths)
-				weight += s.match_path(path);
-			if (weight > best_weight) {
-				ret.emplace(&s);
-				best_weight = weight;
-			}
-		}
-		return ret;
-	}
-
-	struct GetMaintainers
-	{
-		std::string email;
-		int count;
-	};
-
-	template<typename F>
-	void for_all_stanzas(const SQLConn &db,
-			     const std::vector<Stanza> &suse_stanzas,
-			     const std::vector<Stanza> &upstream_stanzas,
-			     const std::set<std::string> &paths,
-			     F pp,
-			     const std::string &what)
-	{
-		std::optional<const Stanza *> stanza = find_best_match(suse_stanzas, paths);
-
-		if (stanza.has_value()) {
-			if (gm.trace)
-				std::cerr << "STANZA: " << stanza.value()->name << std::endl;
-			pp(*stanza.value(), what);
-			return;
-		}
-
-		stanza = find_best_match(upstream_stanzas, paths);
-
-		if (stanza.has_value()) {
-			if (gm.trace)
-				std::cerr << "Upstream STANZA: " << stanza.value()->name << std::endl;
-			pp(*stanza.value(), what);
-			return;
-		}
-
-		if (db) {
-			std::unordered_map<std::string, int> emails_and_counts_m;
-			for (const std::string &p: paths) {
-				const std::filesystem::path path(p);
-				const std::string dir = path.parent_path(), file = path.filename();
-
-				auto mOpt = db.get_maintainers(file, dir, 4);
-				if (!mOpt)
-					fail_with_message("Failed to query.");
-				for (auto &m : *mOpt) {
-					const auto email = std::move(std::get<std::string>(m[0]));
-					const auto count = std::get<int>(m[1]);
-					emails_and_counts_m[email] += count;
-				}
-			}
-			if (!emails_and_counts_m.empty()) {
-				struct GetMaintainers
-				{
-					std::string email;
-					int count;
-				};
-
-				std::vector<GetMaintainers> emails_and_counts_v;
-				for (const auto &e: emails_and_counts_m)
-					emails_and_counts_v.push_back(GetMaintainers(std::move(e.first), e.second));
-				std::sort(emails_and_counts_v.begin(), emails_and_counts_v.end(), [](const GetMaintainers &a, const GetMaintainers &b) {
-					return a.count > b.count;
-				});
-				Stanza s;
-				s.name = "Backporter";
-				for (const auto &e: emails_and_counts_v)
-					s.add_backporter("M: Backporter <" + e.email + ">", e.count);
-				if (gm.trace)
-					std::cerr << "Backporters:" << std::endl;
-				pp(s, what);
-				return;
-			}
-		}
-
-		thread_local auto catch_all_maintainer = Stanza{"Base", "F: Kernel Developers at SuSE <kernel@suse.de>"};
-		if (gm.trace)
-			std::cerr << "STANZA: " << catch_all_maintainer.name << std::endl;
-		pp(catch_all_maintainer, what);
-	}
 }
