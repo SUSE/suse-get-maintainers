@@ -218,7 +218,8 @@ namespace {
 		return ret;
 	}
 
-	void try_to_fetch_env(std::string &var, const std::string &name)
+	template <typename T>
+	void try_to_fetch_env(T &var, const std::string &name)
 	{
 		if (var.empty()) {
 			const char *ptr = std::getenv(name.c_str());
