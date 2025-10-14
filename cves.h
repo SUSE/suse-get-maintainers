@@ -18,7 +18,7 @@ namespace {
 
 	template<ShaSize S>
 	struct CVEHashMap : NonCopyable {
-		CVEHashMap(const std::string &b, int y, bool r) : branch(b), year(y), rejected(r) {}
+		CVEHashMap(const std::string &b, unsigned y, bool r) : branch(b), year(y), rejected(r) {}
 
 		bool load(const std::string &vsource)
 			{
@@ -107,7 +107,7 @@ namespace {
 		std::unordered_multimap<std::string, std::string> m_cve_hash_multimap;
 		std::unordered_map<std::string, std::string> m_sha_hash_map;
 		std::string branch;
-		int year;
+		unsigned year;
 		bool rejected;
 	};
 

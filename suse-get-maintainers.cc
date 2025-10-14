@@ -73,7 +73,7 @@ struct gm {
 	std::string fixes;
 	std::string conf_file_map;
 	std::set<std::string> cves;
-	int year = 0;
+	unsigned int year = 0;
 	bool rejected = false;
 	bool all_cves = false;
 	bool json = false;
