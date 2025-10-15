@@ -20,7 +20,7 @@ namespace {
 	struct CVEHashMap : NonCopyable {
 		CVEHashMap(const std::string &b, unsigned y, bool r) : branch(b), year(y), rejected(r) {}
 
-		bool load(const std::string &vsource)
+		bool load(const std::filesystem::path &vsource)
 			{
 				if (vsource.empty())
 					return false;

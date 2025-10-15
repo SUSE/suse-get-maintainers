@@ -1,6 +1,7 @@
 #ifndef SGM_CVE2BUGZILLA_H
 #define SGM_CVE2BUGZILLA_H
 
+#include <filesystem>
 #include <unordered_map>
 #include <string>
 #include <string_view>
@@ -12,7 +13,7 @@ namespace {
 	struct CVE2Bugzilla : NonCopyable {
 		CVE2Bugzilla() {}
 
-		bool load(const std::string &cve2bugzilla);
+		bool load(const std::filesystem::path &cve2bugzilla);
 		std::string get_bsc(const std::string &cve_number) const;
 		std::string get_cve(const std::string &bsc_number) const;
 	private:
@@ -20,7 +21,7 @@ namespace {
 		std::unordered_map<std::string, std::string> m_bsc_cve_map;
 	};
 
-	bool CVE2Bugzilla::load(const std::string &cve2bugzilla)
+	bool CVE2Bugzilla::load(const std::filesystem::path &cve2bugzilla)
 	{
 		std::ifstream file{cve2bugzilla};
 

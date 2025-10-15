@@ -61,17 +61,17 @@ private:
 
 struct gm {
 	std::filesystem::path maintainers;
-	std::string kernel_tree;
+	std::filesystem::path kernel_tree;
 	std::string origin = "origin";
 	std::string cve_branch = "origin/master";
 	std::set<std::string> shas;
 	std::set<std::string> paths;
 	std::set<std::string> diffs;
-	std::string vulns;
+	std::filesystem::path vulns;
 	std::string whois;
 	std::string grep;
 	std::string fixes;
-	std::string conf_file_map;
+	std::filesystem::path conf_file_map;
 	std::set<std::string> cves;
 	unsigned int year;
 	bool rejected;
@@ -468,7 +468,7 @@ bool fixes(const std::vector<Stanza> &stanzas, const std::string &grep, bool csv
 		});
 	}
 	for (const auto &mf: files) {
-		auto mf_on_the_disk = fetch_file_if_needed({}, mf, "http://fixes.prg2.suse.org/current/" + mf, trace, false, true, std::chrono::hours{12});
+		const auto mf_on_the_disk = fetch_file_if_needed({}, mf, "http://fixes.prg2.suse.org/current/" + mf, trace, false, true, std::chrono::hours{12});
 		if (csv)
 			std::cout << "commit,subsys-part,sle-versions,bsc,cve\n";
 		else
@@ -700,12 +700,12 @@ int main(int argc, char **argv)
 		if (!gm.kernel_tree.empty()) {
 			if (!SlGit::Repo::clone(gm.kernel_tree, "https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git"))
 				fail_with_message(git_error_last()->message);
-			emit_message("\n\nexport LINUX_GIT=\"", gm.kernel_tree, "\" # store into ~/.bashrc\n\n");
+			emit_message("\n\nexport LINUX_GIT=", gm.kernel_tree, " # store into ~/.bashrc\n\n");
 		}
 		if (!gm.vulns.empty()) {
 			if (!SlGit::Repo::clone(gm.vulns, "https://git.kernel.org/pub/scm/linux/security/vulns.git"))
 				fail_with_message(git_error_last()->message);
-			emit_message("\n\nexport VULNS_GIT=\"", gm.vulns, "\" # store into ~/.bashrc\n\n");
+			emit_message("\n\nexport VULNS_GIT=", gm.vulns, " # store into ~/.bashrc\n\n");
 		}
 		return 0;
 	}
@@ -722,7 +722,7 @@ int main(int argc, char **argv)
 		if (!cve_hash_map.load(gm.vulns))
 			fail_with_message("Unable to load kernel vulns database git tree: ", gm.vulns);
 		constexpr const char cve2bugzilla_url[] = "https://gitlab.suse.de/security/cve-database/-/raw/master/data/cve2bugzilla";
-		std::string cve2bugzilla_file = fetch_file_if_needed({}, "cve2bugzilla.txt", cve2bugzilla_url, false, false, false, std::chrono::hours{12});
+		const auto cve2bugzilla_file = fetch_file_if_needed({}, "cve2bugzilla.txt", cve2bugzilla_url, false, false, false, std::chrono::hours{12});
 		CVE2Bugzilla cve_to_bugzilla;
 		if (!cve_to_bugzilla.load(cve2bugzilla_file))
 			fail_with_message("Couldn't load cve2bugzilla.txt");
