@@ -614,6 +614,253 @@ void for_all_stanzas(const SQLConn &db,
 	pp(catch_all_maintainer, what);
 }
 
+void handleInit()
+{
+	if (!gm.kernel_tree.empty()) {
+		if (!SlGit::Repo::clone(gm.kernel_tree, "https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git"))
+			fail_with_message(git_error_last()->message);
+		emit_message("\n\nexport LINUX_GIT=", gm.kernel_tree, " # store into ~/.bashrc\n\n");
+	}
+	if (!gm.vulns.empty()) {
+		if (!SlGit::Repo::clone(gm.vulns, "https://git.kernel.org/pub/scm/linux/security/vulns.git"))
+			fail_with_message(git_error_last()->message);
+		emit_message("\n\nexport VULNS_GIT=", gm.vulns, " # store into ~/.bashrc\n\n");
+	}
+}
+
+void handleFixes(const std::vector<Stanza> &maintainers)
+{
+	CVEHashMap<ShaSize::Short> cve_hash_map{gm.cve_branch, gm.year, gm.rejected};
+	if (!cve_hash_map.load(gm.vulns))
+		fail_with_message("Unable to load kernel vulns database git tree: ", gm.vulns);
+	constexpr const char cve2bugzilla_url[] = "https://gitlab.suse.de/security/cve-database/-/raw/master/data/cve2bugzilla";
+	const auto cve2bugzilla_file = fetch_file_if_needed({}, "cve2bugzilla.txt",
+							    cve2bugzilla_url, false, false, false,
+							    std::chrono::hours{12});
+	CVE2Bugzilla cve_to_bugzilla;
+	if (!cve_to_bugzilla.load(cve2bugzilla_file))
+		fail_with_message("Couldn't load cve2bugzilla.txt");
+	if (!fixes(maintainers, gm.fixes, gm.csv, gm.trace, cve_hash_map, cve_to_bugzilla))
+		fail_with_message("unable to find a match for " + gm.fixes +
+				  " in maintainers or subsystems");
+}
+
+void handleWhois(const std::vector<Stanza> &maintainers,
+		 const std::vector<Stanza> &upstream_maintainers)
+{
+	if (!whois(maintainers, gm.whois))
+		if (!whois(upstream_maintainers, gm.whois))
+			fail_with_message("unable to find " + gm.whois + " among maintainers");
+}
+
+void handleGrep(const std::vector<Stanza> &maintainers,
+		const std::vector<Stanza> &upstream_maintainers)
+{
+	if (!grep(maintainers, gm.grep, gm.names))
+		if (!grep(upstream_maintainers, gm.grep, gm.names))
+			fail_with_message("unable to find a match for " + gm.grep +
+					  " in maintainers or subsystems");
+}
+
+void handleRefresh()
+{
+	if (!gm.vulns.empty())
+		fetch_repo(gm.vulns, "origin");
+	if (!gm.kernel_tree.empty())
+		fetch_repo(gm.kernel_tree, gm.origin);
+}
+
+void handlePaths(const std::vector<Stanza> &maintainers,
+		 const std::vector<Stanza> &upstream_maintainers,
+		 const SQLConn &db)
+{
+	if (gm.from_stdin)
+		gm.paths = read_stdin_sans_new_lines();
+
+	if (gm.paths.size() > 1 || gm.json || gm.csv || gm.from_stdin) {
+		if (gm.json)
+			std::cout << "[\n";
+		bool first = true;
+		for (const auto &p: gm.paths) {
+			std::string what;
+			if (gm.json) {
+				if (!first)
+					what = ",\n";
+				first = false;
+				what += "  {\n    ";
+				what += color_format(gm.colors, T_BLUE, "\"path\"") + ": " +
+						color_format(gm.colors, T_GREEN, "\"" + p + "\"");
+			} else
+				what = p;
+			for_all_stanzas(db, maintainers, upstream_maintainers, {p},
+					gm.json ? json_output : csv_output, what);
+		}
+		if (gm.json)
+			std::cout << "\n]\n";
+	} else
+		for_all_stanzas(db, maintainers, upstream_maintainers, gm.paths, show_emails, "");
+}
+
+void handleDiffs(const std::vector<Stanza> &maintainers,
+		 const std::vector<Stanza> &upstream_maintainers,
+		 const std::set<std::string> &suse_users,
+		 const SQLConn &db)
+{
+	if (gm.from_stdin)
+		gm.diffs = read_stdin_sans_new_lines();
+
+	if (gm.diffs.size() > 1 || gm.json || gm.csv || gm.from_stdin) {
+		if (gm.json)
+			std::cout << "[\n";
+		bool first = true;
+		for (const auto &ps: gm.diffs) {
+			try {
+				auto s = get_paths_from_patch(ps, suse_users, gm.only_maintainers);
+				if (gm.trace && std::holds_alternative<std::set<std::string>>(s)) {
+
+					std::cerr << "patch " << ps << " contains the following paths: " << std::endl;
+					for (const auto &p: std::get<std::set<std::string>>(s))
+						std::cerr << '\t' << p << std::endl;
+				}
+				std::string what;
+				if (gm.json) {
+					if (!first)
+						what = ",\n";
+					first = false;
+					what += "  {\n    ";
+					what += color_format(gm.colors, T_BLUE, "\"diff\"") + ": " +
+							color_format(gm.colors, T_GREEN, "\"" + ps + "\"");
+				} else
+					what = ps;
+				if (std::holds_alternative<std::vector<Person>>(s)) {
+					const std::vector<Person> sb = std::get<std::vector<Person>>(s);
+					show_people(sb, what, false);
+				} else
+					for_all_stanzas(db, maintainers, upstream_maintainers,
+							std::get<std::set<std::string>>(s),
+							gm.json ? json_output : csv_output, what);
+			} catch (...) { continue; }
+		}
+		if (gm.json)
+			std::cout << "\n]\n";
+		return;
+	}
+
+	auto s = get_paths_from_patch(*gm.diffs.cbegin(), suse_users, gm.only_maintainers);
+	if (gm.trace && std::holds_alternative<std::set<std::string>>(s)) {
+		std::cerr << "patch " << *gm.diffs.cbegin() << " contains the following paths: " <<
+			     std::endl;
+		for (const auto &p: std::get<std::set<std::string>>(s))
+			std::cerr << '\t' << p << std::endl;
+	}
+	if (std::holds_alternative<std::vector<Person>>(s)) {
+		const std::vector<Person> sb = std::get<std::vector<Person>>(s);
+		show_people(sb, "", true);
+	} else
+		for_all_stanzas(db, maintainers, upstream_maintainers,
+				std::get<std::set<std::string>>(s), show_emails, "");
+}
+
+void handleCVEs(CVEHashMap<ShaSize::Long> &cve_hash_map)
+{
+	if (gm.vulns.empty())
+		fail_with_message("Provide a path to kernel vulns database git tree either via -v or $VULNS_GIT");
+
+	if (!cve_hash_map.load(gm.vulns))
+		fail_with_message("Unable to load kernel vulns database git tree: ", gm.vulns);
+
+	if (gm.all_cves) {
+		gm.cves = cve_hash_map.get_all_cves();
+		gm.from_stdin = false;
+	}
+
+	if (gm.from_stdin)
+		gm.cves = read_stdin_sans_new_lines();
+
+	if (gm.cves.size() > 1) {
+		validate_cves(gm.cves);
+		for (const auto &c: gm.cves) {
+			const std::vector<std::string> shas = cve_hash_map.get_shas(c);
+			for (const std::string &s: shas) {
+				gm.shas.insert(s);
+				if (gm.trace)
+					std::cerr << "CVE(" << c << ") is SHA(" << s << ")" << std::endl;
+			}
+			if (shas.empty())
+				std::cerr << "Unable to translate CVE number (" << c << ") to SHA hash" << std::endl;
+		}
+	} else {
+		const std::vector<std::string> shas = cve_hash_map.get_shas(*gm.cves.cbegin());
+		for (const std::string &s: shas) {
+			gm.shas.insert(s);
+			if (gm.trace)
+				std::cerr << "CVE(" << *gm.cves.cbegin() << ") is SHA(" << s << ")" << std::endl;
+		}
+		if (shas.empty())
+			fail_with_message("Unable to translate CVE number (", *gm.cves.cbegin(), ") to SHA hash");
+	}
+}
+
+void handleSHAs(const std::vector<Stanza> &maintainers,
+		const std::vector<Stanza> &upstream_maintainers,
+		const std::set<std::string> &suse_users,
+		const CVEHashMap<ShaSize::Long> &cve_hash_map,
+		const SQLConn &db,
+		bool has_cves)
+{
+	if (gm.kernel_tree.empty())
+		fail_with_message("Provide a path to mainline git kernel tree either via -k or $LINUX_GIT");
+
+	auto rkOpt = SlGit::Repo::open(gm.kernel_tree);
+	if (!rkOpt)
+		fail_with_message("Unable load kernel tree: ", gm.kernel_tree, " (",
+				  git_error_last()->message, ")");
+
+	if (gm.shas.size() == 1 && gm.from_stdin && !has_cves)
+		gm.shas = read_stdin_sans_new_lines();
+	const bool simple = gm.shas.size() == 1 && !gm.from_stdin && !gm.csv && !gm.json;
+
+	validate_shas(gm.shas, has_cves ? 40 : 12);
+	bool first = true;
+
+	if (gm.json)
+		std::cout << "[\n";
+
+	search_commit(*rkOpt, gm.shas, suse_users, gm.only_maintainers, gm.trace,
+		      [&maintainers, &upstream_maintainers, &has_cves, &first, &cve_hash_map, &db, simple]
+		      (const std::string &sha, const std::vector<Person> &sb,
+		       const std::set<std::string> &paths) {
+		if (gm.trace && !paths.empty()) {
+			std::cerr << "SHA " << sha << " contains the following paths: " << std::endl;
+			for (const auto &p: paths)
+				emit_message('\t', p);
+		}
+		std::string what;
+		if (gm.json) {
+			if (!first)
+				what = ",\n";
+			first = false;
+			what += "  {\n";
+			if (has_cves)
+				what += "    " + color_format(gm.colors, T_BLUE, "\"cve\"") + ": " +
+						color_format(gm.colors, T_GREEN,  "\"" +
+							     cve_hash_map.get_cve(sha) + "\"") + ",\n";
+			what += "    " + color_format(gm.colors, T_BLUE, "\"sha\"") + ": " +
+					color_format(gm.colors, T_GREEN, "\"" + sha + "\"");
+		} else if (has_cves)
+			what = cve_hash_map.get_cve(sha) + "," + sha;
+		else
+			what = sha;
+		if (!sb.empty()) {
+			show_people(sb, what, simple);
+		} else
+			for_all_stanzas(db, maintainers, upstream_maintainers, paths,
+					simple ? show_emails : gm.json ? json_output : csv_output, what);
+	});
+	if (gm.json)
+		std::cout << "\n]\n";
+}
+
 } // namespace
 
 int main(int argc, char **argv)
@@ -646,16 +893,7 @@ int main(int argc, char **argv)
 	    emit_message("Could not set a limit for opened files: ", libgit2_limit_opened_files);
 
 	if (gm.init) {
-		if (!gm.kernel_tree.empty()) {
-			if (!SlGit::Repo::clone(gm.kernel_tree, "https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git"))
-				fail_with_message(git_error_last()->message);
-			emit_message("\n\nexport LINUX_GIT=", gm.kernel_tree, " # store into ~/.bashrc\n\n");
-		}
-		if (!gm.vulns.empty()) {
-			if (!SlGit::Repo::clone(gm.vulns, "https://git.kernel.org/pub/scm/linux/security/vulns.git"))
-				fail_with_message(git_error_last()->message);
-			emit_message("\n\nexport VULNS_GIT=", gm.vulns, " # store into ~/.bashrc\n\n");
-		}
+		handleInit();
 		return 0;
 	}
 
@@ -667,122 +905,35 @@ int main(int argc, char **argv)
 		load_upstream_maintainers_file(upstream_maintainers, suse_users, gm.kernel_tree, gm.origin);
 
 	if (!gm.fixes.empty()) {
-		CVEHashMap<ShaSize::Short> cve_hash_map{gm.cve_branch, gm.year, gm.rejected};
-		if (!cve_hash_map.load(gm.vulns))
-			fail_with_message("Unable to load kernel vulns database git tree: ", gm.vulns);
-		constexpr const char cve2bugzilla_url[] = "https://gitlab.suse.de/security/cve-database/-/raw/master/data/cve2bugzilla";
-		const auto cve2bugzilla_file = fetch_file_if_needed({}, "cve2bugzilla.txt", cve2bugzilla_url, false, false, false, std::chrono::hours{12});
-		CVE2Bugzilla cve_to_bugzilla;
-		if (!cve_to_bugzilla.load(cve2bugzilla_file))
-			fail_with_message("Couldn't load cve2bugzilla.txt");
-		if (!fixes(maintainers, gm.fixes, gm.csv, gm.trace, cve_hash_map, cve_to_bugzilla))
-			fail_with_message("unable to find a match for " + gm.fixes + " in maintainers or subsystems");
+		handleFixes(maintainers);
 		return 0;
 	}
 
-
 	if (!gm.whois.empty()) {
-		if (!whois(maintainers, gm.whois))
-			if (!whois(upstream_maintainers, gm.whois))
-				fail_with_message("unable to find " + gm.whois + " among maintainers");
+		handleWhois(maintainers, upstream_maintainers);
 		return 0;
 	}
 
 	if (!gm.grep.empty()) {
-		if (!grep(maintainers, gm.grep, gm.names))
-			if (!grep(upstream_maintainers, gm.grep, gm.names))
-				fail_with_message("unable to find a match for " + gm.grep + " in maintainers or subsystems");
+		handleGrep(maintainers, upstream_maintainers);
 		return 0;
 	}
 
-	if (gm.refresh) {
-		if (!gm.vulns.empty())
-			fetch_repo(gm.vulns, "origin");
-		if (!gm.kernel_tree.empty())
-			fetch_repo(gm.kernel_tree, gm.origin);
-	}
+	if (gm.refresh)
+		handleRefresh();
 
 	SQLConn db;
 	if (!gm.no_db)
 		if (db.open(gm.conf_file_map))
 			fail_with_message("Failed to open db: ", gm.conf_file_map);
 
-
 	if (!gm.paths.empty()) {
-		if (gm.from_stdin)
-			gm.paths = read_stdin_sans_new_lines();
-
-		if (gm.paths.size() > 1 || gm.json || gm.csv || gm.from_stdin) {
-			if (gm.json)
-				std::cout << "[\n";
-			bool first = true;
-			for (const auto &p: gm.paths) {
-				std::string what;
-				if (gm.json) {
-					if (!first)
-						what = ",\n";
-					first = false;
-					what += "  {\n    ";
-					what += color_format(gm.colors, T_BLUE, "\"path\"") + ": " + color_format(gm.colors, T_GREEN, "\"" + p + "\"");
-				} else
-					what = p;
-				for_all_stanzas(db, maintainers, upstream_maintainers, std::set<std::string>{p}, gm.json ? json_output : csv_output, what);
-			}
-			if (gm.json)
-				std::cout << "\n]\n";
-		} else
-			for_all_stanzas(db, maintainers, upstream_maintainers, gm.paths, show_emails, "");
+		handlePaths(maintainers, upstream_maintainers, db);
 		return 0;
 	}
 
 	if (!gm.diffs.empty()) {
-		if (gm.from_stdin)
-			gm.diffs = read_stdin_sans_new_lines();
-
-		if (gm.diffs.size() > 1 || gm.json || gm.csv || gm.from_stdin) {
-			if (gm.json)
-				std::cout << "[\n";
-			bool first = true;
-			for (const auto &ps: gm.diffs) {
-				try {
-					std::variant<std::set<std::string>, std::vector<Person>> s = get_paths_from_patch(ps, suse_users, gm.only_maintainers);
-					if (gm.trace && std::holds_alternative<std::set<std::string>>(s)) {
-
-						std::cerr << "patch " << ps << " contains the following paths: " << std::endl;
-						for (const auto &p: std::get<std::set<std::string>>(s))
-							std::cerr << '\t' << p << std::endl;
-					}
-					std::string what;
-					if (gm.json) {
-						if (!first)
-							what = ",\n";
-						first = false;
-						what += "  {\n    ";
-						what += color_format(gm.colors, T_BLUE, "\"diff\"") + ": " + color_format(gm.colors, T_GREEN, "\"" + ps + "\"");
-					} else
-						what = ps;
-					if (std::holds_alternative<std::vector<Person>>(s)) {
-						const std::vector<Person> sb = std::get<std::vector<Person>>(s);
-						show_people(sb, what, false);
-					} else
-						for_all_stanzas(db, maintainers, upstream_maintainers, std::get<std::set<std::string>>(s), gm.json ? json_output : csv_output, what);
-				} catch (...) { continue; }
-			}
-			if (gm.json)
-				std::cout << "\n]\n";
-		} else {
-			std::variant<std::set<std::string>, std::vector<Person>> s = get_paths_from_patch(*gm.diffs.cbegin(), suse_users, gm.only_maintainers);
-			if (gm.trace && std::holds_alternative<std::set<std::string>>(s)) {
-				std::cerr << "patch " << *gm.diffs.cbegin() << " contains the following paths: " << std::endl;
-				for (const auto &p: std::get<std::set<std::string>>(s))
-					std::cerr << '\t' << p << std::endl;
-			}
-			if (std::holds_alternative<std::vector<Person>>(s)) {
-				const std::vector<Person> sb = std::get<std::vector<Person>>(s);
-				show_people(sb, "", true);
-			} else
-				for_all_stanzas(db, maintainers, upstream_maintainers, std::get<std::set<std::string>>(s), show_emails, "");
-		}
+		handleDiffs(maintainers, upstream_maintainers, suse_users, db);
 		return 0;
 	}
 
@@ -790,91 +941,13 @@ int main(int argc, char **argv)
 	bool has_cves = false;
 
 	if (!gm.cves.empty() || gm.all_cves) {
+		handleCVEs(cve_hash_map);
 		has_cves = true;
-		if (gm.vulns.empty())
-			fail_with_message("Provide a path to kernel vulns database git tree either via -v or $VULNS_GIT");
-
-		if (!cve_hash_map.load(gm.vulns))
-			fail_with_message("Unable to load kernel vulns database git tree: ", gm.vulns);
-
-		if (gm.all_cves) {
-			gm.cves = cve_hash_map.get_all_cves();
-			gm.from_stdin = false;
-		}
-
-		if (gm.from_stdin)
-			gm.cves = read_stdin_sans_new_lines();
-
-		if (gm.cves.size() > 1) {
-			validate_cves(gm.cves);
-			for (const auto &c: gm.cves) {
-				const std::vector<std::string> shas = cve_hash_map.get_shas(c);
-				for (const std::string &s: shas) {
-					gm.shas.insert(s);
-					if (gm.trace)
-						std::cerr << "CVE(" << c << ") is SHA(" << s << ")" << std::endl;
-				}
-				if (shas.empty())
-					std::cerr << "Unable to translate CVE number (" << c << ") to SHA hash" << std::endl;
-			}
-		} else {
-			const std::vector<std::string> shas = cve_hash_map.get_shas(*gm.cves.cbegin());
-			for (const std::string &s: shas) {
-				gm.shas.insert(s);
-				if (gm.trace)
-					std::cerr << "CVE(" << *gm.cves.cbegin() << ") is SHA(" << s << ")" << std::endl;
-			}
-			if (shas.empty())
-				fail_with_message("Unable to translate CVE number (", *gm.cves.cbegin(), ") to SHA hash");
-		}
 	}
 
 	if (!gm.shas.empty()) {
-		if (gm.kernel_tree.empty())
-			fail_with_message("Provide a path to mainline git kernel tree either via -k or $LINUX_GIT");
-
-		auto rkOpt = SlGit::Repo::open(gm.kernel_tree);
-		if (!rkOpt)
-			fail_with_message("Unable load kernel tree: ", gm.kernel_tree, " (", git_error_last()->message, ")");
-
-		if (gm.shas.size() == 1 && gm.from_stdin && !has_cves)
-			gm.shas = read_stdin_sans_new_lines();
-		const bool simple = gm.shas.size() == 1 && !gm.from_stdin && !gm.csv && !gm.json;
-
-		validate_shas(gm.shas, has_cves ? 40 : 12);
-		bool first = true;
-
-		if (gm.json)
-			std::cout << "[\n";
-
-		search_commit(*rkOpt, gm.shas, suse_users, gm.only_maintainers, gm.trace,
-			      [&maintainers, &upstream_maintainers, &has_cves, &first, &cve_hash_map, &db, simple]
-			      (const std::string &sha, const std::vector<Person> &sb, const std::set<std::string> &paths) {
-			if (gm.trace && !paths.empty()) {
-				std::cerr << "SHA " << sha << " contains the following paths: " << std::endl;
-				for (const auto &p: paths)
-					emit_message('\t', p);
-			}
-			std::string what;
-			if (gm.json) {
-				if (!first)
-					what = ",\n";
-				first = false;
-				what += "  {\n";
-				if (has_cves)
-					what += "    " + color_format(gm.colors, T_BLUE, "\"cve\"") + ": " + color_format(gm.colors, T_GREEN,  "\"" + cve_hash_map.get_cve(sha) + "\"") + ",\n";
-				what += "    " + color_format(gm.colors, T_BLUE, "\"sha\"") + ": " + color_format(gm.colors, T_GREEN, "\"" + sha + "\"");
-			} else if (has_cves)
-				what = cve_hash_map.get_cve(sha) + "," + sha;
-			else
-				what = sha;
-			if (!sb.empty()) {
-				show_people(sb, what, simple);
-			} else
-				for_all_stanzas(db, maintainers, upstream_maintainers, paths, simple ? show_emails : gm.json ? json_output : csv_output, what);
-		});
-		if (gm.json)
-			std::cout << "\n]\n";
+		handleSHAs(maintainers, upstream_maintainers, suse_users, cve_hash_map, db,
+			   has_cves);
 		return 0;
 	}
 
