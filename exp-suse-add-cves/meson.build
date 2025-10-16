@@ -16,13 +16,14 @@ if host_machine.cpu_family() == 'x86_64'
 endif
 
 libcurl = dependency('slcurl++')
+libcves = dependency('slcves++')
 libgit = dependency('slgit++')
 
 prj_name = meson.project_name()
 executable(prj_name,
   [ prj_name + '.cc' ],
   implicit_include_directories: false,
-  dependencies: [ libcurl, libgit ],
+  dependencies: [ libcurl, libcves, libgit ],
   install: true,
 )
 

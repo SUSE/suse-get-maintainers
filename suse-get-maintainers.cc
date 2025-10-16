@@ -10,12 +10,12 @@
 #include <filesystem>
 
 #include <sl/curl/Curl.h>
+#include <sl/cves/CVEHashMap.h>
 #include <sl/git/Git.h>
 #include <sl/sqlite/SQLConn.h>
 
 #include "helpers.h"
 #include "git2.h"
-#include "cves.h"
 #include "maintainers.h"
 #include "cve2bugzilla.h"
 // TODO
@@ -405,7 +405,8 @@ bool grep(const std::vector<Stanza> &stanzas, const std::string &grep, bool name
 	return found;
 }
 
-bool fixes(const std::vector<Stanza> &stanzas, const std::string &grep, bool csv, bool trace, const CVEHashMap<ShaSize::Short> &cve_hash_map, const CVE2Bugzilla &cve_to_bugzilla)
+bool fixes(const std::vector<Stanza> &stanzas, const std::string &grep, bool csv, bool trace,
+	   const SlCVEs::CVEHashMap &cve_hash_map, const CVE2Bugzilla &cve_to_bugzilla)
 {
 	const auto re = std::regex(grep, std::regex::icase | std::regex::optimize);
 	bool found = false;
@@ -631,7 +632,8 @@ void handleInit()
 
 void handleFixes(const std::vector<Stanza> &maintainers)
 {
-	CVEHashMap<ShaSize::Short> cve_hash_map{gm.cve_branch, gm.year, gm.rejected};
+	SlCVEs::CVEHashMap cve_hash_map{SlCVEs::CVEHashMap::ShaSize::Short, gm.cve_branch, gm.year,
+				gm.rejected};
 	if (!cve_hash_map.load(gm.vulns))
 		fail_with_message("Unable to load kernel vulns database git tree: ", gm.vulns);
 	constexpr const char cve2bugzilla_url[] = "https://gitlab.suse.de/security/cve-database/-/raw/master/data/cve2bugzilla";
@@ -763,7 +765,7 @@ void handleDiffs(const std::vector<Stanza> &maintainers,
 				std::get<std::set<std::string>>(s), show_emails, "");
 }
 
-void handleCVEs(CVEHashMap<ShaSize::Long> &cve_hash_map)
+void handleCVEs(SlCVEs::CVEHashMap &cve_hash_map)
 {
 	if (gm.vulns.empty())
 		fail_with_message("Provide a path to kernel vulns database git tree either via -v or $VULNS_GIT");
@@ -806,7 +808,7 @@ void handleCVEs(CVEHashMap<ShaSize::Long> &cve_hash_map)
 void handleSHAs(const std::vector<Stanza> &maintainers,
 		const std::vector<Stanza> &upstream_maintainers,
 		const std::set<std::string> &suse_users,
-		const CVEHashMap<ShaSize::Long> &cve_hash_map,
+		const SlCVEs::CVEHashMap &cve_hash_map,
 		const SQLConn &db,
 		bool has_cves)
 {
@@ -950,7 +952,8 @@ int main(int argc, char **argv)
 		return 0;
 	}
 
-	CVEHashMap<ShaSize::Long> cve_hash_map{gm.cve_branch, gm.year, gm.rejected};
+	SlCVEs::CVEHashMap cve_hash_map{SlCVEs::CVEHashMap::ShaSize::Long, gm.cve_branch, gm.year,
+				gm.rejected};
 	bool has_cves = false;
 
 	if (!gm.cves.empty() || gm.all_cves) {

@@ -19,6 +19,7 @@ endif
 
 cxxopts = dependency('cxxopts')
 libcurl = dependency('slcurl++')
+libcves = dependency('slcves++')
 libgit2 = dependency('slgit++')
 sqlite3 = dependency('slsqlite++')
 
@@ -26,7 +27,7 @@ prj_name = meson.project_name()
 executable(prj_name,
   [ prj_name + '.cc' ],
   implicit_include_directories: false,
-  dependencies: [ cxxopts, libcurl, libgit2, sqlite3 ],
+  dependencies: [ cxxopts, libcves, libcurl, libgit2, sqlite3 ],
   install: true,
 )
 

@@ -10,10 +10,10 @@
 #include <utime.h>
 
 #include <sl/curl/Curl.h>
+#include <sl/cves/CVEHashMap.h>
 #include <sl/git/Repo.h>
 
 #include "helpers.h"
-#include "cves.h"
 #include "cve2bugzilla.h"
 
 namespace {
@@ -85,7 +85,7 @@ int main(int argc, char **argv)
 		}
 	}
 
-	CVEHashMap<ShaSize::Long> cve_hash_map{gm.cve_branch, 0, false};
+	SlCVEs::CVEHashMap cve_hash_map{SlCVEs::CVEHashMap::ShaSize::Long, gm.cve_branch, 0, false};
 	if (!cve_hash_map.load(gm.vulns))
 		fail_with_message("Couldn't load kernel vulns database git tree");
 
