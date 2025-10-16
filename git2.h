@@ -5,7 +5,6 @@
 #include <vector>
 #include <set>
 #include <cstdio>
-#include <unordered_map>
 #include <sstream>
 #include <iostream>
 
@@ -43,52 +42,6 @@ namespace {
 		}
 		return ret;
 	}
-
-	struct Files : NonCopyable
-	{
-		int from_tree_filtered(const SlGit::Tree &tree, const std::regex &r)
-		{
-			return tree.walk([&r, this](const std::string &root,
-					 const SlGit::TreeEntry &e) -> int {
-				if (e.type() == GIT_OBJECT_BLOB) {
-					auto path = root + e.name();
-					if (std::regex_match(path, r))
-						m_paths.insert(std::make_pair(path, *e.id()));
-				}
-				return 0;
-			});
-		}
-		std::optional<std::unordered_map<std::string, std::string>>
-		file_contents(const SlGit::Repo &repo)
-		{
-			std::unordered_map<std::string, std::string> contents;
-			bool errors = false;
-			for (const auto &p: m_paths) {
-				auto b = repo.blobLookup(p.second);
-				if (!b) {
-					emit_message(git_error_last()->message);
-					errors = true;
-					continue;
-				}
-				contents.insert(std::make_pair(p.first, b->content()));
-			}
-			if (contents.empty() && errors)
-				return {};
-			return contents;
-		}
-
-		std::set<std::string> get_paths() const
-		{
-			std::set<std::string> ret;
-			for (const auto& p: m_paths)
-				ret.insert(p.first);
-			return ret;
-		}
-
-		bool empty() const { return m_paths.empty(); }
-	private:
-		std::unordered_map<std::string, git_oid> m_paths;
-	};
 
 	void simple_tree_diff(const SlGit::Repo &repo, const SlGit::Tree &pt, const SlGit::Tree &ct,
 			      std::set<std::string> &paths,

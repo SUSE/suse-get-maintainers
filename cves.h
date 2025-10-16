@@ -7,7 +7,11 @@
 #include <algorithm>
 #include <string>
 #include <sstream>
-#include "git2.h"
+
+#include <sl/git/Git.h>
+#include <sl/helpers/String.h>
+
+#include "helpers.h"
 
 namespace {
 	enum struct ShaSize
@@ -35,36 +39,34 @@ namespace {
 				if (!commit)
 					fail_with_message(error_message, branch, "; ", git_error_last()->message);
 
-				const std::string cve_prefix = rejected ? "cve/rejected/" : "cve/published/";
-
-				const auto regex_sha1_file = year
-					? std::regex(cve_prefix + std::to_string(year) + "/.*sha1", std::regex::optimize)
-					: std::regex(cve_prefix + ".*sha1", std::regex::optimize);
-
-				Files files;
-				if (files.from_tree_filtered(*commit->tree(), regex_sha1_file))
-					fail_with_message(error_message, branch, "; ", git_error_last()->message);
-
-				if (files.empty() && year)
-					throw 0;
-
-				const auto contentsOpt = files.file_contents(*vulns_repo);
-				if (!contentsOpt)
-					fail_with_message(error_message, branch, "; ", git_error_last()->message);
+				std::string cve_prefix = rejected ? "cve/rejected/" : "cve/published/";
+				if (year)
+					cve_prefix += std::to_string(year) + '/';
+				const auto subTree = commit->tree()->treeEntryByPath(cve_prefix);
+				if (!subTree)
+					fail_with_message(branch, "; ", git_error_last()->message);
 
 				const auto regex_cve_number = std::regex("CVE-[0-9][0-9][0-9][0-9]-[0-9]+", std::regex::optimize);
-				for (const auto &[file, contents]: *contentsOpt) {
+
+				vulns_repo->treeLookup(*subTree)->walk([&regex_cve_number, &vulns_repo, this](const std::string &,
+								       const SlGit::TreeEntry &entry) -> int {
+					if (entry.type() != GIT_OBJECT_BLOB)
+						return 0;
+					const std::string file = entry.name();
+					if (!SlHelpers::String::endsWith(file, ".sha1"))
+						return 0;
+
 					std::smatch match;
 					std::regex_search(file, match, regex_cve_number);
 					std::string cve_number = match.str();
 					if (cve_number.size() < 10) {
-						emit_message(cve_number, " doesn't seem to be a cve number!");
-						continue;
+						std::cout << cve_number << " doesn't seem to be a cve number!\n";
+						return 0;
 					}
-					std::istringstream iss(contents);
+					std::istringstream iss(vulns_repo->blobLookup(entry)->content());
 					std::string sha_hash;
 					while (iss >> sha_hash) {
-						if (!is_hex(sha_hash) || sha_hash.size() != 40) {
+						if (!SlHelpers::String::isHex(sha_hash) || sha_hash.size() != 40) {
 							emit_message('"', sha_hash, "\" doesn't seem to be a commit hash! (from a file \"", file, "\")");
 							continue;
 						}
@@ -75,7 +77,9 @@ namespace {
 							m_sha_hash_map.insert(std::make_pair(std::move(sha_hash), cve_number));
 						}
 					}
-				}
+					return 0;
+				});
+
 				return true;
 			}
 
