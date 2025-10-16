@@ -12,6 +12,7 @@
 #include <sl/curl/Curl.h>
 #include <sl/cves/CVEHashMap.h>
 #include <sl/git/Repo.h>
+#include <sl/helpers/String.h>
 
 #include "helpers.h"
 #include "cve2bugzilla.h"
@@ -105,7 +106,7 @@ int main(int argc, char **argv)
 		auto lines = read_patch_sans_new_lines<false>(file);
 		long sha_idx;
 		const auto sha = get_hash(lines, sha_idx);
-		if (sha.size() != 40 || !is_hex(sha)) {
+		if (sha.size() != 40 || !SlHelpers::String::isHex(sha)) {
 			emit_message(path_to_patch, " has no valid Git-commit reference (", sha, ")");
 			continue;
 		}

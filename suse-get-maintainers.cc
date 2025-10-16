@@ -486,7 +486,7 @@ bool fixes(const std::vector<Stanza> &stanzas, const std::string &grep, bool csv
 				};
 
 				const auto possible_sha = (line.size() > 13 && line[12] == ' ') ? line.substr(0, 12) : "nope";
-				if (is_hex(possible_sha)) {
+				if (SlHelpers::String::isHex(possible_sha)) {
 					possible_cve = cve_hash_map.get_cve(possible_sha);
 					csv_details[commit] = possible_sha;
 				} else if (csv) {

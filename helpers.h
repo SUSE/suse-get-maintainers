@@ -45,11 +45,6 @@ namespace {
 		NonCopyable& operator=(const NonCopyable&) = delete;
 	};
 
-	bool is_hex(const std::string_view s)
-	{
-		return std::all_of(s.cbegin(), s.cend(), ::isxdigit);
-	}
-
 	std::string_view trim(const std::string_view &line)
 	{
 		static constexpr const char *spaces = " \n\t\r";

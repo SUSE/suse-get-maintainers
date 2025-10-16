@@ -10,6 +10,7 @@
 
 #include <sl/git/Git.h>
 #include <sl/helpers/Misc.h>
+#include <sl/helpers/String.h>
 
 #include "helpers.h"
 
@@ -17,7 +18,7 @@ namespace {
 	void validate_shas(std::set<std::string> &s, std::size_t min)
 	{
 		for (auto &str: s)
-			if (!is_hex(str) || (str.size() > 40 || str.size() < min))
+			if (!SlHelpers::String::isHex(str) || (str.size() > 40 || str.size() < min))
 				emit_message(str, " does not seem to be a SHA hash of at least ", min, " characters long");
 	}
 
