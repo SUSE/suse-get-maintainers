@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0-only
 
 tests = {
-  'curl' : [ libcurl ],
   'maintainers' : [ libgit2 ],
 }
 

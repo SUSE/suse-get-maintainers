@@ -9,13 +9,13 @@
 #include <unistd.h>
 #include <filesystem>
 
+#include <sl/curl/Curl.h>
 #include <sl/git/Git.h>
 #include <sl/sqlite/SQLConn.h>
 
 #include "helpers.h"
 #include "git2.h"
 #include "cves.h"
-#include "curl.h"
 #include "maintainers.h"
 #include "cve2bugzilla.h"
 // TODO
@@ -61,6 +61,7 @@ private:
 };
 
 struct gm {
+	std::filesystem::path cacheDir;
 	std::filesystem::path maintainers;
 	std::filesystem::path kernel_tree;
 	std::string origin;
@@ -426,7 +427,7 @@ bool fixes(const std::vector<Stanza> &stanzas, const std::string &grep, bool csv
 		});
 	}
 	for (const auto &mf: files) {
-		const auto mf_on_the_disk = fetch_file_if_needed({}, mf, "http://fixes.prg2.suse.org/current/" + mf, trace, false, true, std::chrono::hours{12});
+		const auto mf_on_the_disk = SlCurl::LibCurl::fetchFileIfNeeded(gm.cacheDir / mf, "http://fixes.prg2.suse.org/current/" + mf, false, true, std::chrono::hours{12});
 		if (csv)
 			std::cout << "commit,subsys-part,sle-versions,bsc,cve\n";
 		else
@@ -634,9 +635,10 @@ void handleFixes(const std::vector<Stanza> &maintainers)
 	if (!cve_hash_map.load(gm.vulns))
 		fail_with_message("Unable to load kernel vulns database git tree: ", gm.vulns);
 	constexpr const char cve2bugzilla_url[] = "https://gitlab.suse.de/security/cve-database/-/raw/master/data/cve2bugzilla";
-	const auto cve2bugzilla_file = fetch_file_if_needed({}, "cve2bugzilla.txt",
-							    cve2bugzilla_url, false, false, false,
-							    std::chrono::hours{12});
+	const auto cve2bugzilla_file = SlCurl::LibCurl::fetchFileIfNeeded(gm.cacheDir / "cve2bugzilla.txt",
+									  cve2bugzilla_url,
+									  false, false,
+									  std::chrono::hours{12});
 	CVE2Bugzilla cve_to_bugzilla;
 	if (!cve_to_bugzilla.load(cve2bugzilla_file))
 		fail_with_message("Couldn't load cve2bugzilla.txt");
@@ -876,15 +878,26 @@ int main(int argc, char **argv)
 
 	parse_options(argc, argv);
 
-	constexpr const char maintainers_url[] = "https://kerncvs.suse.de/MAINTAINERS";
-	gm.maintainers = fetch_file_if_needed(gm.maintainers, "MAINTAINERS", maintainers_url, gm.trace, gm.refresh, false, std::chrono::hours{12});
+	gm.cacheDir = SlHelpers::HomeDir::createCacheDir("suse-get-maintainers");
+	if (gm.cacheDir.empty())
+		fail_with_message("Unable to create a cache dir");
 
-	constexpr const char conf_file_map[] = "https://kerncvs.suse.de/conf_file_map.sqlite";
+	if (gm.maintainers.empty() || !std::filesystem::exists(gm.maintainers))
+		gm.maintainers = SlCurl::LibCurl::fetchFileIfNeeded(gm.cacheDir / "MAINTAINERS",
+						      "https://kerncvs.suse.de/MAINTAINERS",
+						      gm.refresh, false, std::chrono::hours{12});
+
 	if (!gm.no_db)
-		gm.conf_file_map = fetch_file_if_needed({}, "conf_file_map.sqlite", conf_file_map, gm.trace, gm.refresh, false, std::chrono::days{7});
+		gm.conf_file_map = SlCurl::LibCurl::fetchFileIfNeeded(gm.cacheDir / "conf_file_map.sqlite",
+								      "https://kerncvs.suse.de/conf_file_map.sqlite",
+								      gm.refresh, false,
+								      std::chrono::days{7});
 
 	// TODO
-	const auto temporary = fetch_file_if_needed({}, "user-bugzilla-map.txt", "https://kerncvs.suse.de/user-bugzilla-map.txt", gm.trace, gm.refresh, false, std::chrono::hours{12});
+	const auto temporary = SlCurl::LibCurl::fetchFileIfNeeded(gm.cacheDir / "user-bugzilla-map.txt",
+								  "https://kerncvs.suse.de/user-bugzilla-map.txt",
+								  gm.refresh, false,
+								  std::chrono::hours{12});
 	load_temporary(translation_table, temporary);
 	// END TODO
 

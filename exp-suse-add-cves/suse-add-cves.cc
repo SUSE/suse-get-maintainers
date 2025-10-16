@@ -9,11 +9,11 @@
 #include <sys/stat.h>
 #include <utime.h>
 
+#include <sl/curl/Curl.h>
 #include <sl/git/Repo.h>
 
 #include "helpers.h"
 #include "cves.h"
-#include "curl.h"
 #include "cve2bugzilla.h"
 
 namespace {
@@ -43,8 +43,10 @@ int main(int argc, char **argv)
 		fail_with_message("You must provide at least one patch or clone the vulns repository with --init (-i) and --vulns (-v)!  See --help (-h)!");
 
 	constexpr const char cve2bugzilla_url[] = "https://gitlab.suse.de/security/cve-database/-/raw/master/data/cve2bugzilla";
-	auto cve2bugzilla_file = fetch_file_if_needed({}, "cve2bugzilla.txt", cve2bugzilla_url,
-						      false, false, false, std::chrono::hours{12});
+	auto cve2bugzilla_file = SlCurl::LibCurl::fetchFileIfNeeded("cve2bugzilla.txt",
+								    cve2bugzilla_url,
+								    false, false,
+								    std::chrono::hours{12});
 
 	if (gm.init) {
 		if (!gm.vulns.empty()) {
@@ -73,9 +75,9 @@ int main(int argc, char **argv)
 
 			if (mtime < now - expires_after) {
 				SlGit::Repo::update(gm.vulns);
-				cve2bugzilla_file = fetch_file_if_needed({}, "cve2bugzilla.txt",
+				cve2bugzilla_file = SlCurl::LibCurl::fetchFileIfNeeded("cve2bugzilla.txt",
 									 cve2bugzilla_url,
-									 false, true, false,
+									 true, false,
 									 std::chrono::hours{12});
 			}
 			std::filesystem::last_write_time(origin_master_ref, now);
