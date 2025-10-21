@@ -72,8 +72,8 @@ struct gm {
 	std::string origin;
 	std::string cve_branch;
 	std::set<std::string> shas;
-	std::set<std::string> paths;
-	std::set<std::string> diffs;
+	std::set<std::filesystem::path> paths;
+	std::set<std::filesystem::path> diffs;
 	std::set<std::string> cves;
 	std::filesystem::path vulns;
 	std::string whois;
@@ -539,9 +539,10 @@ bool fixes(const std::vector<Stanza> &stanzas, const std::string &grep, bool csv
 	return found;
 }
 
-std::set<std::string> read_stdin_sans_new_lines()
+template<typename T = std::string>
+std::set<T> read_stdin_sans_new_lines()
 {
-	std::set<std::string> ret;
+	std::set<T> ret;
 
 	for (std::string line; std::getline(std::cin, line);)
 		ret.insert(SlHelpers::String::trim(line));
@@ -549,7 +550,8 @@ std::set<std::string> read_stdin_sans_new_lines()
 	return ret;
 }
 
-std::optional<const Stanza *> find_best_match(const std::vector<Stanza> &sl, const std::set<std::string> &paths)
+std::optional<const Stanza *> find_best_match(const std::vector<Stanza> &sl,
+					      const std::set<std::filesystem::path> &paths)
 {
 	std::optional<const Stanza *> ret;
 	unsigned best_weight = 0;
@@ -575,7 +577,7 @@ template<typename F>
 void for_all_stanzas(const SQLConn &db,
 		     const std::vector<Stanza> &suse_stanzas,
 		     const std::vector<Stanza> &upstream_stanzas,
-		     const std::set<std::string> &paths,
+		     const std::set<std::filesystem::path> &paths,
 		     F pp,
 		     const std::string &what)
 {
@@ -599,11 +601,8 @@ void for_all_stanzas(const SQLConn &db,
 
 	if (db) {
 		std::unordered_map<std::string, unsigned> emails_and_counts_m;
-		for (const std::string &p: paths) {
-			const std::filesystem::path path(p);
-			const std::string dir = path.parent_path(), file = path.filename();
-
-			auto mOpt = db.get_maintainers(file, dir, 4);
+		for (const auto &path: paths) {
+			auto mOpt = db.get_maintainers(path.filename(), path.parent_path(), 4);
 			if (!mOpt)
 				fail_with_message("Failed to query.");
 			for (auto &m : *mOpt) {
@@ -705,7 +704,7 @@ void handlePaths(const std::vector<Stanza> &maintainers,
 		 const SQLConn &db)
 {
 	if (gm.from_stdin)
-		gm.paths = read_stdin_sans_new_lines();
+		gm.paths = read_stdin_sans_new_lines<std::filesystem::path>();
 
 	if (gm.paths.size() > 1 || gm.json || gm.csv || gm.from_stdin) {
 		if (gm.json)
@@ -732,19 +731,12 @@ void handlePaths(const std::vector<Stanza> &maintainers,
 		for_all_stanzas(db, maintainers, upstream_maintainers, gm.paths, show_emails, "");
 }
 
-std::variant<std::set<std::string>, std::vector<Person>>
-get_paths_from_patch(const std::string &path, const std::set<std::string> &users,
+std::variant<std::set<std::filesystem::path>, std::vector<Person>>
+get_paths_from_patch(const std::filesystem::path &path, const std::set<std::string> &users,
 		     bool skip_signoffs)
 {
-	std::variant<std::set<std::string>, std::vector<Person>> ret;
-	std::string path_to_patch;
-
-	if (!path.empty() && path[0] != '/') {
-		const char *pwd = std::getenv("PWD");
-		if (pwd)
-			path_to_patch = std::string(pwd) + "/" + path;
-	} else
-		path_to_patch = path;
+	std::variant<std::set<std::filesystem::path>, std::vector<Person>> ret;
+	const auto path_to_patch = std::filesystem::absolute(path);
 
 	std::ifstream file(path_to_patch);
 	if (!file.is_open())
@@ -753,7 +745,7 @@ get_paths_from_patch(const std::string &path, const std::set<std::string> &users
 	thread_local const auto regex_add = std::regex("^\\+\\+\\+ [ab]/(.+)", std::regex::optimize);
 	thread_local const auto regex_rem = std::regex("^--- [ab]/(.+)", std::regex::optimize);
 
-	std::set<std::string> paths;
+	std::set<std::filesystem::path> paths;
 	std::vector<Person> people;
 	bool signoffs = true;
 	std::smatch match;
@@ -790,7 +782,7 @@ void handleDiffs(const std::vector<Stanza> &maintainers,
 		 const SQLConn &db)
 {
 	if (gm.from_stdin)
-		gm.diffs = read_stdin_sans_new_lines();
+		gm.diffs = read_stdin_sans_new_lines<std::filesystem::path>();
 
 	if (gm.diffs.size() > 1 || gm.json || gm.csv || gm.from_stdin) {
 		if (gm.json)
@@ -799,10 +791,10 @@ void handleDiffs(const std::vector<Stanza> &maintainers,
 		for (const auto &ps: gm.diffs) {
 			try {
 				auto s = get_paths_from_patch(ps, suse_users, gm.only_maintainers);
-				if (gm.trace && std::holds_alternative<std::set<std::string>>(s)) {
+				if (gm.trace && std::holds_alternative<std::set<std::filesystem::path>>(s)) {
 
 					std::cerr << "patch " << ps << " contains the following paths: " << std::endl;
-					for (const auto &p: std::get<std::set<std::string>>(s))
+					for (const auto &p: std::get<std::set<std::filesystem::path>>(s))
 						std::cerr << '\t' << p << std::endl;
 				}
 				std::ostringstream what;
@@ -821,7 +813,7 @@ void handleDiffs(const std::vector<Stanza> &maintainers,
 					show_people(sb, what.str(), false);
 				} else
 					for_all_stanzas(db, maintainers, upstream_maintainers,
-							std::get<std::set<std::string>>(s),
+							std::get<std::set<std::filesystem::path>>(s),
 							gm.json ? json_output : csv_output,
 							what.str());
 			} catch (...) { continue; }
@@ -832,10 +824,10 @@ void handleDiffs(const std::vector<Stanza> &maintainers,
 	}
 
 	auto s = get_paths_from_patch(*gm.diffs.cbegin(), suse_users, gm.only_maintainers);
-	if (gm.trace && std::holds_alternative<std::set<std::string>>(s)) {
+	if (gm.trace && std::holds_alternative<std::set<std::filesystem::path>>(s)) {
 		std::cerr << "patch " << *gm.diffs.cbegin() << " contains the following paths: " <<
 			     std::endl;
-		for (const auto &p: std::get<std::set<std::string>>(s))
+		for (const auto &p: std::get<std::set<std::filesystem::path>>(s))
 			std::cerr << '\t' << p << std::endl;
 	}
 	if (std::holds_alternative<std::vector<Person>>(s)) {
@@ -843,7 +835,7 @@ void handleDiffs(const std::vector<Stanza> &maintainers,
 		show_people(sb, "", true);
 	} else
 		for_all_stanzas(db, maintainers, upstream_maintainers,
-				std::get<std::set<std::string>>(s), show_emails, "");
+				std::get<std::set<std::filesystem::path>>(s), show_emails, "");
 }
 
 void validate_cves(const std::set<std::string> &s)
@@ -923,7 +915,7 @@ void handleSHAs(const std::vector<Stanza> &maintainers,
 	search_commit(*rkOpt, gm.shas, suse_users, gm.only_maintainers, gm.trace,
 		      [&maintainers, &upstream_maintainers, &has_cves, &first, &cve_hash_map, &db, simple]
 		      (const std::string &sha, const std::vector<Person> &sb,
-		       const std::set<std::string> &paths) {
+		       const std::set<std::filesystem::path> &paths) {
 		if (gm.trace && !paths.empty()) {
 			std::cerr << "SHA " << sha << " contains the following paths: " << std::endl;
 			for (const auto &p: paths)

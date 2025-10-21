@@ -41,7 +41,7 @@ namespace {
 	}
 
 	void simple_tree_diff(const SlGit::Repo &repo, const SlGit::Tree &pt, const SlGit::Tree &ct,
-			      std::set<std::string> &paths,
+			      std::set<std::filesystem::path> &paths,
 			      const std::string &prefix = std::string());
 
 	struct ObjDiff {
@@ -52,7 +52,7 @@ namespace {
 	};
 
 	void simple_tree_entry_add(const SlGit::TreeEntry &e, const SlGit::Repo &repo,
-				   std::set<std::string> &paths, const std::string &prefix,
+				   std::set<std::filesystem::path> &paths, const std::string &prefix,
 				   const std::string &name)
 	{
 		const auto type = e.type();
@@ -79,7 +79,7 @@ namespace {
 
 	void simple_tree_entry_diff(const std::string &name, const SlGit::Repo &repo,
 				    const SlGit::TreeEntry &a, const SlGit::TreeEntry &b,
-				    std::set<std::string> &paths, const std::string &prefix)
+				    std::set<std::filesystem::path> &paths, const std::string &prefix)
 	{
 		if (git_oid_cmp(a.id(), b.id()) == 0)
 			return;
@@ -111,7 +111,7 @@ namespace {
 	}
 
 	void simple_tree_diff(const SlGit::Repo &repo, const SlGit::Tree &pt,
-			      const SlGit::Tree &ct, std::set<std::string> &paths,
+			      const SlGit::Tree &ct, std::set<std::filesystem::path> &paths,
 			      const std::string &prefix)
 	{
 		std::map<std::string, ObjDiff> entries;
@@ -152,7 +152,7 @@ namespace {
 			if (!commit || commit->parentCount() != 1)
 				continue;
 
-			std::set<std::string> paths;
+			std::set<std::filesystem::path> paths;
 			std::vector<SGM::Person> sb;
 			if (!skip_signoffs) {
 				sb = get_somebody_else(*commit, suse_users);

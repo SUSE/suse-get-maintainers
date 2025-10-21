@@ -35,7 +35,7 @@ namespace {
 				m_weight = p.m_weight;
 				p.m_pathspec = nullptr;
 			}
-		unsigned match(const std::string &path) const
+		unsigned match(const std::filesystem::path &path) const
 			{
 				if (git_pathspec_matches_path(m_pathspec, GIT_PATHSPEC_DEFAULT, path.c_str()) == 1)
 					return m_weight;
@@ -72,7 +72,7 @@ namespace {
 	};
 
 	struct Stanza {
-		unsigned match_path(const std::string &path) const
+		unsigned match_path(const std::filesystem::path &path) const
 			{
 				return std::accumulate(m_patterns.cbegin(), m_patterns.cend(), 0u,
 						       [&path](unsigned m, const Pattern &p) { return std::max(m, p.match(path)); });
