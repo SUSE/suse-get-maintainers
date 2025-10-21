@@ -2,7 +2,6 @@
 #define SGM_GIT2_H
 
 #include <string>
-#include <vector>
 #include <set>
 #include <cstdio>
 #include <sstream>
@@ -13,6 +12,7 @@
 #include <sl/helpers/String.h>
 
 #include "helpers.h"
+#include "Person.h"
 
 namespace {
 	void validate_shas(std::set<std::string> &s, std::size_t min)
@@ -22,24 +22,20 @@ namespace {
 				emit_message(str, " does not seem to be a SHA hash of at least ", min, " characters long");
 	}
 
-	std::vector<Person> get_somebody_else(const SlGit::Commit &commit,
-					      const std::set<std::string> &users)
+	std::vector<SGM::Person> get_somebody_else(const SlGit::Commit &commit,
+						   const std::set<std::string> &users)
 	{
-		std::vector<Person> ret;
-		Person a;
-		const git_signature *author;
-		author = commit.author();
-		a.name = author->name;
-		a.email = author->email;
-		a.role = Role::Author;
-		if (is_suse_address(users, a.email))
-			ret.push_back(std::move(a));
+		std::vector<SGM::Person> ret;
+		const auto author = commit.author();
+		if (is_suse_address(users, author->email))
+			ret.push_back(SGM::Person(SGM::Role::Author, author->name, author->email));
+
 		const std::string message = commit.message();
 		std::istringstream stream(message);
 		for (std::string line; std::getline(stream, line);) {
-			Person p;
-			if (p.parse(line) && is_suse_address(users, p.email))
-				ret.push_back(std::move(p));
+			if (auto p = SGM::Person::parse(line))
+				if (is_suse_address(users, p->email()))
+					ret.push_back(std::move(*p));
 		}
 		return ret;
 	}
@@ -157,7 +153,7 @@ namespace {
 				continue;
 
 			std::set<std::string> paths;
-			std::vector<Person> sb;
+			std::vector<SGM::Person> sb;
 			if (!skip_signoffs) {
 				sb = get_somebody_else(*commit, suse_users);
 				if (!sb.empty()) {

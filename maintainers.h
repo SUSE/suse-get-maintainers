@@ -12,6 +12,7 @@
 #include <sl/helpers/String.h>
 
 #include "helpers.h"
+#include "Person.h"
 
 namespace {
 	struct Pattern : NonCopyable {
@@ -78,37 +79,36 @@ namespace {
 			}
 		void add_maintainer_and_store(const std::string_view maintainer, std::set<std::string> &suse_users)
 			{
-				Person m{Role::Maintainer};
-				if (parse_person(maintainer, m.name, m.email)) {
-					suse_users.insert(m.email.substr(0, m.email.find_first_of("@")));
+				if (auto m = SGM::Person::parsePerson(maintainer,
+								      SGM::Role::Maintainer)) {
+					suse_users.insert(m->email().substr(0, m->email().find_first_of("@")));
 					// TODO
-					m.email = translate_email(m.email);
+					m->setEmail(translate_email(m->email()));
 					// END TODO
-					m_maintainers.push_back(std::move(m));
+					m_maintainers.push_back(std::move(*m));
 				} else
 					emit_message("MAINTAINERS: contact ", maintainer, " cannot be parsed into name and email!");
 			}
 		void add_backporter(const std::string_view maintainer, int cnt)
 			{
-				Person m{Role::Maintainer};
-				m.count = cnt;
-				if (parse_person(maintainer, m.name, m.email)) {
+				if (auto m = SGM::Person::parsePerson(maintainer,
+								      SGM::Role::Maintainer, cnt)) {
 					// TODO
-					m.email = translate_email(m.email);
+					m->setEmail(translate_email(m->email()));
 					// END TODO
-					m_maintainers.push_back(std::move(m));
+					m_maintainers.push_back(std::move(*m));
 				} else
 					emit_message("MAINTAINERS: contact ", maintainer, " cannot be parsed into name and email!");
 			}
 		void add_maintainer_if(const std::string_view maintainer, const std::set<std::string> &suse_users)
 			{
-				Person m{Role::Upstream};
-				if (parse_person(maintainer, m.name, m.email)) {
+				if (auto m = SGM::Person::parsePerson(maintainer,
+								      SGM::Role::Upstream)) {
 					// TODO
-					m.email = translate_email(m.email);
+					m->setEmail(translate_email(m->email()));
 					// END TODO
-					if (suse_users.contains(m.email.substr(0, m.email.find("@"))))
-						m_maintainers.push_back(std::move(m));
+					if (suse_users.contains(m->email().substr(0, m->email().find("@"))))
+						m_maintainers.push_back(std::move(*m));
 				} else
 					emit_message("Upstream MAINTAINERS: contact ", maintainer, " cannot be parsed into name and email!");
 			}
@@ -125,15 +125,14 @@ namespace {
 			}
 		Stanza(const std::string &n, const std::string &who) : name(n)
 			{
-				Person m{Role::Maintainer};
-				if (parse_person(who, m.name, m.email))
-					m_maintainers.push_back(std::move(m));
+				if (auto m = SGM::Person::parsePerson(who, SGM::Role::Maintainer))
+					m_maintainers.push_back(std::move(*m));
 			}
 		Stanza() = default;
 		void new_entry(const std::string_view n) { name = n; m_maintainers.clear(); m_patterns.clear(); }
 		std::string name;
 	private:
-		std::vector<Person> m_maintainers;
+		std::vector<SGM::Person> m_maintainers;
 		std::vector<Pattern> m_patterns;
 	};
 

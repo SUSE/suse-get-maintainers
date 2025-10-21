@@ -19,10 +19,12 @@
 #include "git2.h"
 #include "maintainers.h"
 #include "cve2bugzilla.h"
+#include "Person.h"
 // TODO
 #include "temporary.h"
 // END TODO
 
+using namespace SGM;
 using Clr = SlHelpers::Color;
 
 namespace {
@@ -258,10 +260,10 @@ void parse_options(int argc, char **argv)
 void show_emails(const Stanza &m, const std::string &)
 {
 	m.for_all_maintainers([](const Person &p) {
-		if (gm.names && !p.name.empty())
-			std::cout << p.name << " <" << p.email << ">\n";
+		if (gm.names && !p.name().empty())
+			std::cout << p.name() << " <" << p.email() << ">\n";
 		else
-			std::cout << p.email << '\n';
+			std::cout << p.email() << '\n';
 	});
 }
 
@@ -269,10 +271,10 @@ void csv_output(const Stanza &m, const std::string &what)
 {
 	std::cout << what << ',' << '"' << m.name << '"';
 	m.for_all_maintainers([](const Person &p) {
-		if (gm.names && !p.name.empty())
-			std::cout << "," << p.name << " <" << p.email << ">";
+		if (gm.names && !p.name().empty())
+			std::cout << "," << p.name() << " <" << p.email() << ">";
 		else
-			std::cout << "," << p.email;
+			std::cout << "," << p.email();
 	});
 	std::cout << '\n';
 }
@@ -289,11 +291,11 @@ void json_output(const Stanza &m, const std::string &what)
 	bool first = true;
 	int backport_counts = 0;
 	m.for_all_maintainers([&first, &backport_counts](const Person &p) {
-		backport_counts += p.count;
+		backport_counts += p.count();
 		if (!first)
 			std::cout << ",\n      ";
 		first = false;
-		const std::string who = gm.names && !p.name.empty() ? p.name + " <" + p.email + ">" : p.email;
+		const std::string who = gm.names && !p.name().empty() ? p.name() + " <" + p.email() + ">" : p.email();
 		Clr(Clr::GREEN) << Clr::NoNL << std::quoted(who);
 	});
 	if (backport_counts > 0) {
@@ -305,7 +307,7 @@ void json_output(const Stanza &m, const std::string &what)
 			if (!first)
 				std::cout << ",\n      ";
 			first = false;
-			Clr(Clr::GREEN) << Clr::NoNL << p.count;
+			Clr(Clr::GREEN) << Clr::NoNL << p.count();
 		});
 	}
 	std::cout << "\n    ]\n  }";
@@ -317,12 +319,12 @@ void show_people(const std::vector<Person> &sb, const std::string &what, bool si
 	if (simple) {
 		std::set<std::string> duplicate_set;
 		for (const Person &p: sb) {
-			std::string tmp_email = translate_email(p.email); // TODO
+			std::string tmp_email = translate_email(p.email()); // TODO
 			if (duplicate_set.contains(tmp_email))
 				continue;
 			duplicate_set.insert(tmp_email);
 			if (gm.names)
-				std::cout << p.name << " <";
+				std::cout << p.name() << " <";
 			std::cout << tmp_email; // TODO
 			if (gm.names)
 				std::cout << ">";
@@ -335,11 +337,11 @@ void show_people(const std::vector<Person> &sb, const std::string &what, bool si
 		bool first = true;
 		int backport_counts = 0;
 		for (const Person &p: sb) {
-			backport_counts += p.count;
+			backport_counts += p.count();
 			if (!first)
 				std::cout << ",\n      ";
 			first = false;
-			Clr(Clr::GREEN) << Clr::NoNL << std::quoted(to_string(p.role));
+			Clr(Clr::GREEN) << Clr::NoNL << std::quoted(p.role().toString());
 		}
 		std::cout << "\n    ],\n    ";
 		Clr(Clr::BLUE) << Clr::NoNL << "\"emails\"";
@@ -349,8 +351,8 @@ void show_people(const std::vector<Person> &sb, const std::string &what, bool si
 			if (!first)
 				std::cout << ",\n      ";
 			first = false;
-			const std::string tmp_email = translate_email(p.email); // TODO
-			const std::string who = gm.names && !p.name.empty() ? p.name + " <" + tmp_email + ">" : tmp_email;
+			const std::string tmp_email = translate_email(p.email()); // TODO
+			const std::string who = gm.names && !p.name().empty() ? p.name() + " <" + tmp_email + ">" : tmp_email;
 			Clr(Clr::GREEN) << Clr::NoNL << std::quoted(who);
 		}
 		if (backport_counts > 0) {
@@ -362,7 +364,7 @@ void show_people(const std::vector<Person> &sb, const std::string &what, bool si
 				if (!first)
 					std::cout << ",\n      ";
 				first = false;
-				Clr(Clr::GREEN) << Clr::NoNL << p.count;
+				Clr(Clr::GREEN) << Clr::NoNL << p.count();
 			}
 		}
 		std::cout << "\n    ]\n  }";
@@ -373,7 +375,7 @@ void show_people(const std::vector<Person> &sb, const std::string &what, bool si
 			if (!first)
 				std::cout << '/';
 			first = false;
-			std::cout << to_string(p.role);
+			std::cout << p.role().toString();
 		}
 		std::cout << '"' << ',';
 		first = true;
@@ -381,9 +383,9 @@ void show_people(const std::vector<Person> &sb, const std::string &what, bool si
 			if (!first)
 				std::cout << ',';
 			first = false;
-			std::string tmp_email = translate_email(p.email); // TODO
+			std::string tmp_email = translate_email(p.email()); // TODO
 			if (gm.names)
-				std::cout << p.name << " <";
+				std::cout << p.name() << " <";
 			std::cout << tmp_email; // TODO
 			if (gm.names)
 				std::cout << ">";
@@ -397,7 +399,7 @@ bool whois(const std::vector<Stanza> &stanzas, const std::string &whois)
 	bool found = false;
 	for (const auto& s: stanzas) {
 		s.for_all_maintainers([&s, &whois, &found](const Person &p) {
-			if (p.email == whois || p.email.starts_with(whois + "@")) {
+			if (p.email() == whois || p.email().starts_with(whois + "@")) {
 				std::cout << s.name << "\n";
 				found = true;
 			}
@@ -413,13 +415,13 @@ bool grep(const std::vector<Stanza> &stanzas, const std::string &grep, bool name
 	for (const auto& s: stanzas) {
 		s.for_all_maintainers([&re, &s, &grep, &found, names](const Person &p) {
 			try {
-				if (std::regex_search(p.email, re) ||
-						std::regex_search(p.name, re) ||
+				if (std::regex_search(p.email(), re) ||
+						std::regex_search(p.name(), re) ||
 						std::regex_search(s.name, re)) {
 					if (names)
-						std::cout << '"' << p.name << " <" << p.email << ">\"";
+						std::cout << '"' << p.name() << " <" << p.email() << ">\"";
 					else
-						std::cout << p.email;
+						std::cout << p.email();
 					std::cout << ",\"" << s.name << "\"\n";
 					found = true;
 				}
@@ -455,8 +457,8 @@ bool fixes(const std::vector<Stanza> &stanzas, const std::string &grep, bool csv
 	for (const auto& s: stanzas) {
 		s.for_all_maintainers([&re, &s, &grep, &found, &files](const Person &p) {
 			try {
-				if (std::regex_search(p.email, re) ||
-						std::regex_search(p.name, re) ||
+				if (std::regex_search(p.email(), re) ||
+						std::regex_search(p.name(), re) ||
 						std::regex_search(s.name, re)) {
 					files.insert(maintainer_file_name_from_subsystem(s.name));
 					found = true;
@@ -611,7 +613,7 @@ void for_all_stanzas(const SQLConn &db,
 	}
 
 	if (db) {
-		std::unordered_map<std::string, int> emails_and_counts_m;
+		std::unordered_map<std::string, unsigned> emails_and_counts_m;
 		for (const std::string &p: paths) {
 			const std::filesystem::path path(p);
 			const std::string dir = path.parent_path(), file = path.filename();
@@ -629,7 +631,7 @@ void for_all_stanzas(const SQLConn &db,
 			struct GetMaintainers
 			{
 				std::string email;
-				int count;
+				unsigned count;
 			};
 
 			std::vector<GetMaintainers> emails_and_counts_v;
@@ -774,13 +776,13 @@ get_paths_from_patch(const std::string &path, const std::set<std::string> &users
 		line.erase(0, line.find_first_not_of(" \t"));
 		if (!skip_signoffs && signoffs) {
 			if (line.starts_with("From") || line.starts_with("Author")) {
-				Person a{Role::Author};
-				if (parse_person(line, a.name, a.email) && is_suse_address(users, a.email))
-					people.push_back(std::move(a));
+				if (const auto p = Person::parsePerson(line, Role::Author))
+					if (is_suse_address(users, p->email()))
+						people.push_back(std::move(*p));
 			}
-			Person p;
-			if (p.parse(line) && is_suse_address(users, p.email))
-				people.push_back(std::move(p));
+			if (const auto p = Person::parse(line))
+				if (is_suse_address(users, p->email()))
+					people.push_back(std::move(*p));
 			if (line.starts_with("---"))
 			    signoffs = false;
 		}
