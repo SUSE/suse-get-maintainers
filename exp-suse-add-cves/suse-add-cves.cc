@@ -149,12 +149,6 @@ int main(int argc, char **argv)
 
 	parse_options(argc, argv);
 
-	constexpr const char cve2bugzilla_url[] = "https://gitlab.suse.de/security/cve-database/-/raw/master/data/cve2bugzilla";
-	auto cve2bugzilla_file = SlCurl::LibCurl::fetchFileIfNeeded("cve2bugzilla.txt",
-								    cve2bugzilla_url,
-								    false, false,
-								    std::chrono::hours{12});
-
 	if (gm.init) {
 		if (!gm.vulns.empty()) {
 			if (!SlGit::Repo::clone(gm.vulns, "https://git.kernel.org/pub/scm/linux/security/vulns.git"))
@@ -172,6 +166,7 @@ int main(int argc, char **argv)
 			fail_with_message("Provide a path to kernel vulns database git tree either via -v or $VULNS_GIT");
 	}
 
+	bool forceCVE2Bugzilla = false;
 	{
 		const auto origin_master_ref = gm.vulns / ".git/refs/remotes/origin/master";
 
@@ -182,10 +177,7 @@ int main(int argc, char **argv)
 
 			if (mtime < now - expires_after) {
 				SlGit::Repo::update(gm.vulns);
-				cve2bugzilla_file = SlCurl::LibCurl::fetchFileIfNeeded("cve2bugzilla.txt",
-									 cve2bugzilla_url,
-									 true, false,
-									 std::chrono::hours{12});
+				forceCVE2Bugzilla = true;
 			}
 			std::filesystem::last_write_time(origin_master_ref, now);
 
@@ -196,6 +188,10 @@ int main(int argc, char **argv)
 	if (!cve_hash_map.load(gm.vulns))
 		fail_with_message("Couldn't load kernel vulns database git tree");
 
+	const auto cve2bugzilla_file = SlCurl::LibCurl::fetchFileIfNeeded("cve2bugzilla.txt",
+									  "https://gitlab.suse.de/security/cve-database/-/raw/master/data/cve2bugzilla",
+									  forceCVE2Bugzilla, false,
+									  std::chrono::hours{12});
 	CVE2Bugzilla cve_to_bugzilla;
 	if (!cve_to_bugzilla.load(cve2bugzilla_file))
 		fail_with_message("Couldn't load cve2bugzilla.txt");
