@@ -133,8 +133,7 @@ long get_references_idx(const std::vector<std::string> &v)
 
 bool already_has_cve_ref(const std::string &ref_line, const std::string &cve_number)
 {
-	const auto git_cve_regex = std::regex(cve_number, std::regex::optimize | std::regex::icase);
-	return std::regex_search(ref_line, git_cve_regex);
+	return SlHelpers::String::iFind(ref_line, cve_number) != std::string_view::npos;
 }
 
 bool already_has_bsc_ref(const std::string &ref_line, const std::string &bsc_number)
