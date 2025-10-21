@@ -23,35 +23,35 @@ namespace {
 struct gm {
 	std::filesystem::path vulns;
 	std::string cve_branch;
-	std::vector<std::string> paths;
+	std::vector<std::filesystem::path> paths;
 	bool init;
 } gm;
 
-std::vector<std::string> read_all_patches()
+std::vector<std::filesystem::path> read_all_patches()
 {
-	std::string ksource_git;
+	std::filesystem::path ksource_git;
 	try_to_fetch_env(ksource_git, "KSOURCE_GIT");
 	if (ksource_git.empty())
 		fail_with_message("Please set KSOURCE_GIT!");
-	ksource_git += "/patches.suse";
+	ksource_git /= "patches.suse";
 	if (!std::filesystem::exists(ksource_git))
-		fail_with_message(ksource_git + " does not exists!");
+		fail_with_message(ksource_git, " does not exists!");
 
-	std::vector<std::string> ret;
+	std::vector<std::filesystem::path> ret;
 
 	try {
 		for (const auto &entry: std::filesystem::directory_iterator(ksource_git))
 			ret.push_back(entry.path());
 	} catch (...) {
-		fail_with_message(ksource_git + " cannot be read!");
+		fail_with_message(ksource_git, " cannot be read!");
 	}
 
 	return ret;
 }
 
-template<bool trim> std::vector<std::string> read_patch_sans_new_lines(std::istream &f)
+template<typename T, bool trim> std::vector<T> read_patch_sans_new_lines(std::istream &f)
 {
-	std::vector<std::string> ret;
+	std::vector<T> ret;
 
 	for (std::string line; std::getline(f, line);)
 		if constexpr (trim)
@@ -90,7 +90,7 @@ void parse_options(int argc, char **argv)
 			std::exit(0);
 		}
 		if (opts.contains("from_stdin"))
-			gm.paths = read_patch_sans_new_lines<true>(std::cin);
+			gm.paths = read_patch_sans_new_lines<std::filesystem::path, true>(std::cin);
 		if (opts.contains("ksource_git"))
 			gm.paths = read_all_patches();
 
@@ -205,7 +205,7 @@ int main(int argc, char **argv)
 			continue;
 		}
 
-		auto lines = read_patch_sans_new_lines<false>(file);
+		auto lines = read_patch_sans_new_lines<std::string, false>(file);
 		long sha_idx;
 		const auto sha = get_hash(lines, sha_idx);
 		if (sha.size() != 40 || !SlHelpers::String::isHex(sha)) {
