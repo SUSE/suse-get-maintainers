@@ -8,9 +8,9 @@
 #include <algorithm>
 #include <numeric>
 
+#include <sl/git/Repo.h>
 #include <sl/helpers/String.h>
 
-#include "git2.h"
 #include "helpers.h"
 
 namespace {
