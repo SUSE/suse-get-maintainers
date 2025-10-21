@@ -12,6 +12,7 @@
 #include <sl/curl/Curl.h>
 #include <sl/cves/CVEHashMap.h>
 #include <sl/git/Git.h>
+#include <sl/helpers/Color.h>
 #include <sl/sqlite/SQLConn.h>
 
 #include "helpers.h"
@@ -21,6 +22,8 @@
 // TODO
 #include "temporary.h"
 // END TODO
+
+using Clr = SlHelpers::Color;
 
 namespace {
 
@@ -264,8 +267,13 @@ void csv_output(const Stanza &m, const std::string &what)
 
 void json_output(const Stanza &m, const std::string &what)
 {
-	std::cout << what << ',' << "\n    " << color_format(gm.colors, T_BLUE, "\"subsystem\"") << ": " <<
-		color_format(gm.colors, T_GREEN, std::quoted(m.name)) << ",\n    " << color_format(gm.colors, T_BLUE, "\"emails\"") << ": [\n      ";
+	std::cout << what << ',' << "\n    ";
+	Clr(Clr::BLUE) << Clr::NoNL << "\"subsystem\"";
+	std::cout << ": ";
+	Clr(Clr::GREEN) << Clr::NoNL << std::quoted(m.name);
+	std::cout << ",\n    ";
+	Clr(Clr::BLUE) << Clr::NoNL << "\"emails\"";
+	std::cout << ": [\n      ";
 	bool first = true;
 	int backport_counts = 0;
 	m.for_all_maintainers([&first, &backport_counts](const Person &p) {
@@ -274,16 +282,18 @@ void json_output(const Stanza &m, const std::string &what)
 			std::cout << ",\n      ";
 		first = false;
 		const std::string who = gm.names && !p.name.empty() ? p.name + " <" + p.email + ">" : p.email;
-		std::cout << color_format(gm.colors, T_GREEN, std::quoted(who));
+		Clr(Clr::GREEN) << Clr::NoNL << std::quoted(who);
 	});
 	if (backport_counts > 0) {
-		std::cout << "\n    ],\n    " << color_format(gm.colors, T_BLUE, "\"counts\"") << ": [\n      ";
+		std::cout << "\n    ],\n    ";
+		Clr(Clr::BLUE) << Clr::NoNL << "\"counts\"";
+		std::cout << ": [\n      ";
 		first = true;
 		m.for_all_maintainers([&first](const Person &p) {
 			if (!first)
 				std::cout << ",\n      ";
 			first = false;
-			std::cout << color_format(gm.colors, T_GREEN, p.count);
+			Clr(Clr::GREEN) << Clr::NoNL << p.count;
 		});
 	}
 	std::cout << "\n    ]\n  }";
@@ -307,7 +317,9 @@ void show_people(const std::vector<Person> &sb, const std::string &what, bool si
 			std::cout << '\n';
 		}
 	} else if (gm.json) {
-		std::cout << what << ',' << "\n    " << color_format(gm.colors, T_BLUE, "\"roles\"") << ": [\n      ";
+		std::cout << what << ',' << "\n    ";
+		Clr(Clr::BLUE) << Clr::NoNL << "\"roles\"";
+		std::cout << ": [\n      ";
 		bool first = true;
 		int backport_counts = 0;
 		for (const Person &p: sb) {
@@ -315,9 +327,11 @@ void show_people(const std::vector<Person> &sb, const std::string &what, bool si
 			if (!first)
 				std::cout << ",\n      ";
 			first = false;
-			std::cout << color_format(gm.colors, T_GREEN, std::quoted(to_string(p.role)));
+			Clr(Clr::GREEN) << Clr::NoNL << std::quoted(to_string(p.role));
 		}
-		std::cout << "\n    ],\n    " << color_format(gm.colors, T_BLUE, "\"emails\"") << ": [\n      ";
+		std::cout << "\n    ],\n    ";
+		Clr(Clr::BLUE) << Clr::NoNL << "\"emails\"";
+		std::cout << ": [\n      ";
 		first = true;
 		for (const Person &p: sb) {
 			if (!first)
@@ -325,16 +339,18 @@ void show_people(const std::vector<Person> &sb, const std::string &what, bool si
 			first = false;
 			const std::string tmp_email = translate_email(p.email); // TODO
 			const std::string who = gm.names && !p.name.empty() ? p.name + " <" + tmp_email + ">" : tmp_email;
-			std::cout << color_format(gm.colors, T_GREEN, std::quoted(who));
+			Clr(Clr::GREEN) << Clr::NoNL << std::quoted(who);
 		}
 		if (backport_counts > 0) {
-			std::cout << "\n    ],\n    " << color_format(gm.colors, T_BLUE, "\"counts\"") << ": [\n      ";
+			std::cout << "\n    ],\n    ";
+			Clr(Clr::BLUE) << Clr::NoNL << "\"counts\"";
+			std::cout << ": [\n      ";
 			first = true;
 			for (const Person &p: sb) {
 				if (!first)
 					std::cout << ",\n      ";
 				first = false;
-				std::cout << color_format(gm.colors, T_GREEN, p.count);
+				Clr(Clr::GREEN) << Clr::NoNL << p.count;
 			}
 		}
 		std::cout << "\n    ]\n  }";
@@ -686,18 +702,19 @@ void handlePaths(const std::vector<Stanza> &maintainers,
 			std::cout << "[\n";
 		bool first = true;
 		for (const auto &p: gm.paths) {
-			std::string what;
+			std::ostringstream what;
 			if (gm.json) {
 				if (!first)
-					what = ",\n";
+					what << ",\n";
 				first = false;
-				what += "  {\n    ";
-				what += color_format(gm.colors, T_BLUE, "\"path\"") + ": " +
-						color_format(gm.colors, T_GREEN, "\"" + p + "\"");
+				what << "  {\n    ";
+				Clr(what, Clr::BLUE) << Clr::NoNL << "\"path\"";
+				what << ": ";
+				Clr(what, Clr::GREEN) << Clr::NoNL << '"' << p << '"';
 			} else
-				what = p;
+				what << p;
 			for_all_stanzas(db, maintainers, upstream_maintainers, {p},
-					gm.json ? json_output : csv_output, what);
+					gm.json ? json_output : csv_output, what.str());
 		}
 		if (gm.json)
 			std::cout << "\n]\n";
@@ -726,23 +743,25 @@ void handleDiffs(const std::vector<Stanza> &maintainers,
 					for (const auto &p: std::get<std::set<std::string>>(s))
 						std::cerr << '\t' << p << std::endl;
 				}
-				std::string what;
+				std::ostringstream what;
 				if (gm.json) {
 					if (!first)
-						what = ",\n";
+						what << ",\n";
 					first = false;
-					what += "  {\n    ";
-					what += color_format(gm.colors, T_BLUE, "\"diff\"") + ": " +
-							color_format(gm.colors, T_GREEN, "\"" + ps + "\"");
+					what << "  {\n    ";
+					Clr(what, Clr::BLUE) << Clr::NoNL << "\"diff\"";
+					what << ": ";
+					Clr(what, Clr::GREEN) << Clr::NoNL << '"' << ps << '"';
 				} else
-					what = ps;
+					what << ps;
 				if (std::holds_alternative<std::vector<Person>>(s)) {
 					const std::vector<Person> sb = std::get<std::vector<Person>>(s);
-					show_people(sb, what, false);
+					show_people(sb, what.str(), false);
 				} else
 					for_all_stanzas(db, maintainers, upstream_maintainers,
 							std::get<std::set<std::string>>(s),
-							gm.json ? json_output : csv_output, what);
+							gm.json ? json_output : csv_output,
+							what.str());
 			} catch (...) { continue; }
 		}
 		if (gm.json)
@@ -839,27 +858,34 @@ void handleSHAs(const std::vector<Stanza> &maintainers,
 			for (const auto &p: paths)
 				emit_message('\t', p);
 		}
-		std::string what;
+		std::ostringstream what;
 		if (gm.json) {
 			if (!first)
-				what = ",\n";
+				what << ",\n";
 			first = false;
-			what += "  {\n";
-			if (has_cves)
-				what += "    " + color_format(gm.colors, T_BLUE, "\"cve\"") + ": " +
-						color_format(gm.colors, T_GREEN,  "\"" +
-							     cve_hash_map.get_cve(sha) + "\"") + ",\n";
-			what += "    " + color_format(gm.colors, T_BLUE, "\"sha\"") + ": " +
-					color_format(gm.colors, T_GREEN, "\"" + sha + "\"");
+			what << "  {\n";
+			if (has_cves) {
+				what << "    ";
+				Clr(what, Clr::BLUE) << Clr::NoNL << "\"cve\"";
+				what << ": ";
+				Clr(what, Clr::GREEN) << Clr::NoNL << '"' <<
+							 cve_hash_map.get_cve(sha) << '"';
+				what << ",\n";
+			}
+			what << "    ";
+			Clr(what, Clr::BLUE) << Clr::NoNL << "\"sha\"";
+			what << ": ";
+			Clr(what, Clr::GREEN) << Clr::NoNL << '"' << sha << '"';
 		} else if (has_cves)
-			what = cve_hash_map.get_cve(sha) + "," + sha;
+			what << cve_hash_map.get_cve(sha) << ',' << sha;
 		else
-			what = sha;
+			what << sha;
 		if (!sb.empty()) {
-			show_people(sb, what, simple);
+			show_people(sb, what.str(), simple);
 		} else
 			for_all_stanzas(db, maintainers, upstream_maintainers, paths,
-					simple ? show_emails : gm.json ? json_output : csv_output, what);
+					simple ? show_emails : gm.json ? json_output : csv_output,
+					what.str());
 	});
 	if (gm.json)
 		std::cout << "\n]\n";
@@ -879,6 +905,8 @@ int main(int argc, char **argv)
 	std::set<std::string> suse_users;
 
 	parse_options(argc, argv);
+	Clr::forceColor(true);
+	Clr::forceColorValue(gm.colors);
 
 	gm.cacheDir = SlHelpers::HomeDir::createCacheDir("suse-get-maintainers");
 	if (gm.cacheDir.empty())
