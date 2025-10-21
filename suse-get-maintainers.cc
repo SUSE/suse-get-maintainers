@@ -413,11 +413,9 @@ bool grep(const std::vector<Stanza> &stanzas, const std::string &grep, bool name
 	for (const auto& s: stanzas) {
 		s.for_all_maintainers([&re, &s, &grep, &found, names](const Person &p) {
 			try {
-				std::smatch email_match, name_match, subsystem_match;
-				std::regex_search(p.email, email_match, re);
-				std::regex_search(p.name, name_match, re);
-				std::regex_search(s.name, subsystem_match, re);
-				if (!email_match.empty() || !name_match.empty() || !subsystem_match.empty()) {
+				if (std::regex_search(p.email, re) ||
+						std::regex_search(p.name, re) ||
+						std::regex_search(s.name, re)) {
 					if (names)
 						std::cout << '"' << p.name << " <" << p.email << ">\"";
 					else
@@ -457,11 +455,9 @@ bool fixes(const std::vector<Stanza> &stanzas, const std::string &grep, bool csv
 	for (const auto& s: stanzas) {
 		s.for_all_maintainers([&re, &s, &grep, &found, &files](const Person &p) {
 			try {
-				std::smatch email_match, name_match, subsystem_match;
-				std::regex_search(p.email, email_match, re);
-				std::regex_search(p.name, name_match, re);
-				std::regex_search(s.name, subsystem_match, re);
-				if (!email_match.empty() || !name_match.empty() || !subsystem_match.empty()) {
+				if (std::regex_search(p.email, re) ||
+						std::regex_search(p.name, re) ||
+						std::regex_search(s.name, re)) {
 					files.insert(maintainer_file_name_from_subsystem(s.name));
 					found = true;
 				}
