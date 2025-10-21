@@ -1,4 +1,5 @@
 #include <chrono>
+#include <cxxopts.hpp>
 #include <fstream>
 #include <vector>
 #include <regex>
@@ -18,7 +19,6 @@
 #include "cve2bugzilla.h"
 
 namespace {
-	void usage(const char *prog, std::ostream &os);
 	template<bool> std::vector<std::string> read_patch_sans_new_lines(std::istream &);
 	std::string get_hash(const std::vector<std::string> &, long&);
 	long get_references_idx(const std::vector<std::string> &);
@@ -27,9 +27,9 @@ namespace {
 	void parse_options(int argc, char **argv);
 	struct gm {
 		std::filesystem::path vulns;
-		std::string cve_branch = "origin/master";
+		std::string cve_branch;
 		std::vector<std::string> paths;
-		bool init = false;
+		bool init;
 	} gm;
 
 }
@@ -39,9 +39,6 @@ int main(int argc, char **argv)
 	SGM_BEGIN;
 
 	parse_options(argc, argv);
-
-	if (gm.paths.empty() && (!gm.init || gm.vulns.empty()))
-		fail_with_message("You must provide at least one patch or clone the vulns repository with --init (-i) and --vulns (-v)!  See --help (-h)!");
 
 	constexpr const char cve2bugzilla_url[] = "https://gitlab.suse.de/security/cve-database/-/raw/master/data/cve2bugzilla";
 	auto cve2bugzilla_file = SlCurl::LibCurl::fetchFileIfNeeded("cve2bugzilla.txt",
@@ -53,7 +50,7 @@ int main(int argc, char **argv)
 		if (!gm.vulns.empty()) {
 			if (!SlGit::Repo::clone(gm.vulns, "https://git.kernel.org/pub/scm/linux/security/vulns.git"))
 				fail_with_message(git_error_last()->message);
-			emit_message("\n\nexport VULNS_GIT=\"", gm.vulns, "\" # store into ~/.bashrc\n\n");
+			emit_message("\n\nexport VULNS_GIT=", gm.vulns, " # store into ~/.bashrc\n\n");
 		}
 		return 0;
 	}
@@ -148,67 +145,49 @@ int main(int argc, char **argv)
 
 
 namespace {
-
-	void usage(const char *prog, std::ostream &os)
-	{
-		os << prog << " [PATH_TO_A_PATCH...]\n";
-		os << "  --help, -h                 - Print this help message\n";
-		os << "  --vulns, -v <path>         - Path to the clone of https://git.kernel.org/pub/scm/linux/security/vulns.git ($VULNS_GIT)\n";
-		os << "  --cve_branch, -b           - Which branch do we care about in $VULNS_GIT repository (by default origin/master)\n";
-		os << "  --init, -i                 - Clone the upstream vulns repository;  You need to provide at least -v!\n";
-		os << "  --from_stdin, -f           - Read paths to patches from stdin instead of arguments\n";
-		os << "  --ksource_git, -k          - Just process all files in $KSOURCE_GIT/patches.suse\n";
-	}
-
-	struct option opts[] = {
-		{ "help", no_argument, nullptr, 'h' },
-		{ "vulns", required_argument, nullptr, 'v' },
-		{ "cve_branch", no_argument, nullptr, 'b' },
-		{ "from_stdin", no_argument, nullptr, 'f' },
-		{ "ksource_git", no_argument, nullptr, 'k' },
-		{ "init", no_argument, nullptr, 'i' },
-		{ nullptr, 0, nullptr, 0 },
-	};
-
 	std::vector<std::string> read_all_patches();
 	void parse_options(int argc, char **argv)
 	{
-		int c;
+		cxxopts::Options options { argv[0], "Add CVE numbers to patches" };
+		options.add_options()
+			("h,help", "Print this help message")
+			("v,vulns", "Path to the clone of https://git.kernel.org/pub/scm/linux/security/vulns.git "
+				    "($VULNS_GIT)",
+				cxxopts::value(gm.vulns))
+			("b,cve_branch", "Which branch do we care about in $VULNS_GIT repository "
+					 "(by default origin/master)",
+				cxxopts::value(gm.cve_branch)->default_value("origin/master"))
+			("i,init", "Clone the upstream vulns repository;  You need to provide at "
+				   "least -v!",
+				cxxopts::value(gm.init)->default_value("false"))
+			("f,from_stdin", "Read paths to patches from stdin instead of arguments")
+			("k,ksource_git", "Just process all files in $KSOURCE_GIT/patches.suse")
+			("patches", "Patches to process", cxxopts::value(gm.paths))
+		;
 
-		for (;;) {
-			int opt_idx;
+		options.parse_positional("patches");
+		options.positional_help("[PATH_TO_A_PATCH...]");
 
-			c = getopt_long(argc, argv, "hv:b:ifk", opts, &opt_idx);
-			if (c == -1)
-				break;
-
-			switch (c) {
-			case 'h':
-				usage(argv[0], std::cout);
+		try {
+			const auto opts = options.parse(argc, argv);
+			if (opts.contains("help")) {
+				std::cout << options.help();
 				std::exit(0);
-			case 'v':
-				gm.vulns = optarg;
-				break;
-			case 'b':
-				gm.cve_branch = optarg;
-				break;
-			case 'i':
-				gm.init = true;
-				break;
-			case 'f':
-				gm.paths = read_patch_sans_new_lines<true>(std::cin);
-				break;
-			case 'k':
-				gm.paths = read_all_patches();
-				break;
-			default:
-				usage(argv[0], std::cerr);
-				throw 1;
 			}
-		}
+			if (opts.contains("from_stdin"))
+				gm.paths = read_patch_sans_new_lines<true>(std::cin);
+			if (opts.contains("ksource_git"))
+				gm.paths = read_all_patches();
 
-		for (int i = optind; i < argc; ++i)
-			gm.paths.emplace_back(argv[i]);
+			if (gm.paths.empty() && (!gm.init || gm.vulns.empty()))
+				fail_with_message("You must provide at least one patch or clone the "
+						  "vulns repository with --init (-i) and "
+						  "--vulns (-v)!  See --help (-h)!");
+		} catch (const cxxopts::exceptions::parsing &e) {
+			std::cerr << "arguments error: " << e.what() << '\n';
+			std::cerr << options.help();
+			throw 1;
+		}
 	}
 
 	std::string get_hash(const std::vector<std::string> &v, long &idx)

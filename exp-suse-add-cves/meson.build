@@ -15,6 +15,7 @@ if host_machine.cpu_family() == 'x86_64'
   add_project_arguments('-march=x86-64-v2', language: 'cpp')
 endif
 
+cxxopts = dependency('cxxopts')
 libcurl = dependency('slcurl++')
 libcves = dependency('slcves++')
 libgit = dependency('slgit++')
@@ -23,7 +24,7 @@ prj_name = meson.project_name()
 executable(prj_name,
   [ prj_name + '.cc' ],
   implicit_include_directories: false,
-  dependencies: [ libcurl, libcves, libgit ],
+  dependencies: [ cxxopts, libcurl, libcves, libgit ],
   install: true,
 )
 
