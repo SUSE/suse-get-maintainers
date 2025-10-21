@@ -2,12 +2,9 @@
 #define SGM_HELPERS_H
 
 #include <iostream>
-#include <variant>
-#include <fstream>
 #include <cstdlib>
 #include <cstddef>
 #include <set>
-#include <regex>
 #include <cstring>
 #include <string_view>
 #include <sys/resource.h>
@@ -140,64 +137,6 @@ namespace {
 			}
 	};
 
-	void validate_cves(const std::set<std::string> &s)
-	{
-		thread_local const auto regex_cve_number = std::regex("CVE-[0-9][0-9][0-9][0-9]-[0-9]+", std::regex::optimize);
-		for (const auto &str: s)
-			if (!std::regex_match(str, regex_cve_number))
-				emit_message(str, " does not seem to be a valid CVE number");
-	}
-
-	std::variant<std::set<std::string>, std::vector<Person>> get_paths_from_patch(const std::string &path, const std::set<std::string>& users, bool skip_signoffs)
-	{
-		std::variant<std::set<std::string>, std::vector<Person>> ret;
-		std::string path_to_patch;
-
-		if (!path.empty() && path[0] != '/') {
-			const char *pwd = std::getenv("PWD");
-			if (pwd)
-				path_to_patch = std::string(pwd) + "/" + path;
-		} else
-			path_to_patch = path;
-
-		std::ifstream file(path_to_patch);
-		if (!file.is_open())
-			fail_with_message("Unable to open diff file: ", path_to_patch);
-
-		thread_local const auto regex_add = std::regex("^\\+\\+\\+ [ab]/(.+)", std::regex::optimize);
-		thread_local const auto regex_rem = std::regex("^--- [ab]/(.+)", std::regex::optimize);
-
-		std::set<std::string> paths;
-		std::vector<Person> people;
-		bool signoffs = true;
-		std::smatch match;
-		for (std::string line; std::getline(file, line); ) {
-			line.erase(0, line.find_first_not_of(" \t"));
-			if (!skip_signoffs && signoffs) {
-				if (line.starts_with("From") || line.starts_with("Author")) {
-					Person a{Role::Author};
-					if (parse_person(line, a.name, a.email) && is_suse_address(users, a.email))
-						people.push_back(std::move(a));
-				}
-				Person p;
-				if (p.parse(line) && is_suse_address(users, p.email))
-					people.push_back(std::move(p));
-				if (line.starts_with("---"))
-				    signoffs = false;
-			}
-
-			if (std::regex_search(line, match, regex_add))
-				paths.insert(match.str(1));
-			else if (std::regex_search(line, match, regex_rem))
-				paths.insert(match.str(1));
-		}
-		if (people.empty())
-			ret = std::move(paths);
-		else
-			ret = std::move(people);
-		return ret;
-	}
-
 	template <typename T>
 	void try_to_fetch_env(T &var, const std::string &name)
 	{
@@ -206,33 +145,6 @@ namespace {
 			if (ptr)
 				var = ptr;
 		}
-	}
-
-	// unfortunately, the current format is required by tracking fixes v2
-	std::string maintainer_file_name_from_subsystem(const std::string &s)
-	{
-		std::string ret;
-		for (char c: s) {
-			if (isspace(c) || c == '/')
-				ret.push_back('_');
-			else if (isalnum(c))
-				ret.push_back(tolower(c));
-		}
-		if (ret.empty())
-			fail_with_message("The subsystem name \"" + s + "\" is so bizarre that it ended up being empty!");
-		return ret;
-	}
-
-	std::size_t get_soft_limit_for_opened_files(std::size_t min_limit)
-	{
-		struct rlimit rl;
-		if (getrlimit(RLIMIT_NOFILE, &rl) == 0) {
-			if (rl.rlim_cur < min_limit)
-				fail_with_message("RLIMIT_NOFILE is less than ", min_limit, ".  Please bump it!");
-			return rl.rlim_cur;
-		}
-		emit_message("getrlimit");
-		return 1024;
 	}
 
 	// TODO

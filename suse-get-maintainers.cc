@@ -100,6 +100,18 @@ constexpr std::size_t min_total_opened_files = 80;
 constexpr std::size_t libgit2_opened_files_factor = 2;
 static_assert(min_total_opened_files >= tracking_fixes_opened_files + libgit2_opened_files_factor);
 
+std::size_t get_soft_limit_for_opened_files(std::size_t min_limit)
+{
+	struct rlimit rl;
+	if (getrlimit(RLIMIT_NOFILE, &rl) == 0) {
+		if (rl.rlim_cur < min_limit)
+			fail_with_message("RLIMIT_NOFILE is less than ", min_limit, ".  Please bump it!");
+		return rl.rlim_cur;
+	}
+	emit_message("getrlimit");
+	return 1024;
+}
+
 template <typename T>
 void moveVecToSet(const std::vector<T> &vec, std::set<T> &set) {
 	set.insert(std::make_move_iterator(vec.begin()), std::make_move_iterator(vec.end()));
@@ -421,6 +433,21 @@ bool grep(const std::vector<Stanza> &stanzas, const std::string &grep, bool name
 	return found;
 }
 
+// unfortunately, the current format is required by tracking fixes v2
+std::string maintainer_file_name_from_subsystem(const std::string &s)
+{
+	std::string ret;
+	for (char c: s) {
+		if (isspace(c) || c == '/')
+			ret.push_back('_');
+		else if (isalnum(c))
+			ret.push_back(tolower(c));
+	}
+	if (ret.empty())
+		fail_with_message("The subsystem name \"" + s + "\" is so bizarre that it ended up being empty!");
+	return ret;
+}
+
 bool fixes(const std::vector<Stanza> &stanzas, const std::string &grep, bool csv, bool trace,
 	   const SlCVEs::CVEHashMap &cve_hash_map, const CVE2Bugzilla &cve_to_bugzilla)
 {
@@ -722,6 +749,58 @@ void handlePaths(const std::vector<Stanza> &maintainers,
 		for_all_stanzas(db, maintainers, upstream_maintainers, gm.paths, show_emails, "");
 }
 
+std::variant<std::set<std::string>, std::vector<Person>>
+get_paths_from_patch(const std::string &path, const std::set<std::string> &users,
+		     bool skip_signoffs)
+{
+	std::variant<std::set<std::string>, std::vector<Person>> ret;
+	std::string path_to_patch;
+
+	if (!path.empty() && path[0] != '/') {
+		const char *pwd = std::getenv("PWD");
+		if (pwd)
+			path_to_patch = std::string(pwd) + "/" + path;
+	} else
+		path_to_patch = path;
+
+	std::ifstream file(path_to_patch);
+	if (!file.is_open())
+		fail_with_message("Unable to open diff file: ", path_to_patch);
+
+	thread_local const auto regex_add = std::regex("^\\+\\+\\+ [ab]/(.+)", std::regex::optimize);
+	thread_local const auto regex_rem = std::regex("^--- [ab]/(.+)", std::regex::optimize);
+
+	std::set<std::string> paths;
+	std::vector<Person> people;
+	bool signoffs = true;
+	std::smatch match;
+	for (std::string line; std::getline(file, line); ) {
+		line.erase(0, line.find_first_not_of(" \t"));
+		if (!skip_signoffs && signoffs) {
+			if (line.starts_with("From") || line.starts_with("Author")) {
+				Person a{Role::Author};
+				if (parse_person(line, a.name, a.email) && is_suse_address(users, a.email))
+					people.push_back(std::move(a));
+			}
+			Person p;
+			if (p.parse(line) && is_suse_address(users, p.email))
+				people.push_back(std::move(p));
+			if (line.starts_with("---"))
+			    signoffs = false;
+		}
+
+		if (std::regex_search(line, match, regex_add))
+			paths.insert(match.str(1));
+		else if (std::regex_search(line, match, regex_rem))
+			paths.insert(match.str(1));
+	}
+	if (people.empty())
+		ret = std::move(paths);
+	else
+		ret = std::move(people);
+	return ret;
+}
+
 void handleDiffs(const std::vector<Stanza> &maintainers,
 		 const std::vector<Stanza> &upstream_maintainers,
 		 const std::set<std::string> &suse_users,
@@ -782,6 +861,15 @@ void handleDiffs(const std::vector<Stanza> &maintainers,
 	} else
 		for_all_stanzas(db, maintainers, upstream_maintainers,
 				std::get<std::set<std::string>>(s), show_emails, "");
+}
+
+void validate_cves(const std::set<std::string> &s)
+{
+	thread_local const auto regex_cve_number = std::regex("CVE-[0-9][0-9][0-9][0-9]-[0-9]+",
+							      std::regex::optimize);
+	for (const auto &str: s)
+		if (!std::regex_match(str, regex_cve_number))
+			emit_message(str, " does not seem to be a valid CVE number");
 }
 
 void handleCVEs(SlCVEs::CVEHashMap &cve_hash_map)
