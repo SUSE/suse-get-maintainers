@@ -19,20 +19,130 @@
 #include "cve2bugzilla.h"
 
 namespace {
-	template<bool> std::vector<std::string> read_patch_sans_new_lines(std::istream &);
-	std::string get_hash(const std::vector<std::string> &, long&);
-	long get_references_idx(const std::vector<std::string> &);
-	bool already_has_cve_ref(const std::string&, const std::string&);
-	bool already_has_bsc_ref(const std::string&, const std::string&);
-	void parse_options(int argc, char **argv);
-	struct gm {
-		std::filesystem::path vulns;
-		std::string cve_branch;
-		std::vector<std::string> paths;
-		bool init;
-	} gm;
 
+struct gm {
+	std::filesystem::path vulns;
+	std::string cve_branch;
+	std::vector<std::string> paths;
+	bool init;
+} gm;
+
+std::vector<std::string> read_all_patches()
+{
+	std::string ksource_git;
+	try_to_fetch_env(ksource_git, "KSOURCE_GIT");
+	if (ksource_git.empty())
+		fail_with_message("Please set KSOURCE_GIT!");
+	ksource_git += "/patches.suse";
+	if (!std::filesystem::exists(ksource_git))
+		fail_with_message(ksource_git + " does not exists!");
+
+	std::vector<std::string> ret;
+
+	try {
+		for (const auto &entry: std::filesystem::directory_iterator(ksource_git))
+			ret.push_back(entry.path());
+	} catch (...) {
+		fail_with_message(ksource_git + " cannot be read!");
+	}
+
+	return ret;
 }
+
+template<bool trim> std::vector<std::string> read_patch_sans_new_lines(std::istream &f)
+{
+	std::vector<std::string> ret;
+
+	for (std::string line; std::getline(f, line);)
+		if constexpr (trim)
+			ret.push_back(SlHelpers::String::trim(line));
+		else
+			ret.push_back(line);
+
+	return ret;
+}
+
+void parse_options(int argc, char **argv)
+{
+	cxxopts::Options options { argv[0], "Add CVE numbers to patches" };
+	options.add_options()
+		("h,help", "Print this help message")
+		("v,vulns", "Path to the clone of https://git.kernel.org/pub/scm/linux/security/vulns.git "
+			    "($VULNS_GIT)",
+			cxxopts::value(gm.vulns))
+		("b,cve_branch", "Which branch do we care about in $VULNS_GIT repository "
+				 "(by default origin/master)",
+			cxxopts::value(gm.cve_branch)->default_value("origin/master"))
+		("i,init", "Clone the upstream vulns repository;  You need to provide at least -v!",
+			cxxopts::value(gm.init)->default_value("false"))
+		("f,from_stdin", "Read paths to patches from stdin instead of arguments")
+		("k,ksource_git", "Just process all files in $KSOURCE_GIT/patches.suse")
+		("patches", "Patches to process", cxxopts::value(gm.paths))
+	;
+
+	options.parse_positional("patches");
+	options.positional_help("[PATH_TO_A_PATCH...]");
+
+	try {
+		const auto opts = options.parse(argc, argv);
+		if (opts.contains("help")) {
+			std::cout << options.help();
+			std::exit(0);
+		}
+		if (opts.contains("from_stdin"))
+			gm.paths = read_patch_sans_new_lines<true>(std::cin);
+		if (opts.contains("ksource_git"))
+			gm.paths = read_all_patches();
+
+		if (gm.paths.empty() && (!gm.init || gm.vulns.empty()))
+			fail_with_message("You must provide at least one patch or clone the vulns "
+					  "repository with --init (-i) and --vulns (-v)!  "
+					  "See --help (-h)!");
+	} catch (const cxxopts::exceptions::parsing &e) {
+		std::cerr << "arguments error: " << e.what() << '\n';
+		std::cerr << options.help();
+		throw 1;
+	}
+}
+
+std::string get_hash(const std::vector<std::string> &v, long &idx)
+{
+	thread_local const auto git_commit_regex = std::regex("Git-commit: ([0-9a-fA-F]+)", std::regex::optimize);
+	std::smatch match;
+	idx = 0;
+	for (const auto &line: v) {
+		if (std::regex_search(line, match, git_commit_regex))
+			return SlHelpers::String::trim(match.str(1));
+		++idx;
+	}
+
+	return std::string();
+}
+
+long get_references_idx(const std::vector<std::string> &v)
+{
+	thread_local const auto git_ref_regex = std::regex("References: ", std::regex::optimize | std::regex::icase);
+	long i = 0;
+	for (const auto &line: v) {
+		if (std::regex_search(line, git_ref_regex))
+			return i;
+		++i;
+	}
+	return -1;
+}
+
+bool already_has_cve_ref(const std::string &ref_line, const std::string &cve_number)
+{
+	const auto git_cve_regex = std::regex(cve_number, std::regex::optimize | std::regex::icase);
+	return std::regex_search(ref_line, git_cve_regex);
+}
+
+bool already_has_bsc_ref(const std::string &ref_line, const std::string &bsc_number)
+{
+	return ref_line.find(bsc_number) != std::string::npos;
+}
+
+} // namespace
 
 int main(int argc, char **argv)
 {
@@ -143,122 +253,3 @@ int main(int argc, char **argv)
 	SGM_END;
 }
 
-
-namespace {
-	std::vector<std::string> read_all_patches();
-	void parse_options(int argc, char **argv)
-	{
-		cxxopts::Options options { argv[0], "Add CVE numbers to patches" };
-		options.add_options()
-			("h,help", "Print this help message")
-			("v,vulns", "Path to the clone of https://git.kernel.org/pub/scm/linux/security/vulns.git "
-				    "($VULNS_GIT)",
-				cxxopts::value(gm.vulns))
-			("b,cve_branch", "Which branch do we care about in $VULNS_GIT repository "
-					 "(by default origin/master)",
-				cxxopts::value(gm.cve_branch)->default_value("origin/master"))
-			("i,init", "Clone the upstream vulns repository;  You need to provide at "
-				   "least -v!",
-				cxxopts::value(gm.init)->default_value("false"))
-			("f,from_stdin", "Read paths to patches from stdin instead of arguments")
-			("k,ksource_git", "Just process all files in $KSOURCE_GIT/patches.suse")
-			("patches", "Patches to process", cxxopts::value(gm.paths))
-		;
-
-		options.parse_positional("patches");
-		options.positional_help("[PATH_TO_A_PATCH...]");
-
-		try {
-			const auto opts = options.parse(argc, argv);
-			if (opts.contains("help")) {
-				std::cout << options.help();
-				std::exit(0);
-			}
-			if (opts.contains("from_stdin"))
-				gm.paths = read_patch_sans_new_lines<true>(std::cin);
-			if (opts.contains("ksource_git"))
-				gm.paths = read_all_patches();
-
-			if (gm.paths.empty() && (!gm.init || gm.vulns.empty()))
-				fail_with_message("You must provide at least one patch or clone the "
-						  "vulns repository with --init (-i) and "
-						  "--vulns (-v)!  See --help (-h)!");
-		} catch (const cxxopts::exceptions::parsing &e) {
-			std::cerr << "arguments error: " << e.what() << '\n';
-			std::cerr << options.help();
-			throw 1;
-		}
-	}
-
-	std::string get_hash(const std::vector<std::string> &v, long &idx)
-	{
-		thread_local const auto git_commit_regex = std::regex("Git-commit: ([0-9a-fA-F]+)", std::regex::optimize);
-		std::smatch match;
-		idx = 0;
-		for (const auto &line: v) {
-			if (std::regex_search(line, match, git_commit_regex))
-				return SlHelpers::String::trim(match.str(1));
-			++idx;
-		}
-
-		return std::string();
-	}
-
-	long get_references_idx(const std::vector<std::string> &v)
-	{
-		thread_local const auto git_ref_regex = std::regex("References: ", std::regex::optimize | std::regex::icase);
-		long i = 0;
-		for (const auto &line: v) {
-			if (std::regex_search(line, git_ref_regex))
-				return i;
-			++i;
-		}
-		return -1;
-	}
-
-	bool already_has_cve_ref(const std::string &ref_line, const std::string &cve_number)
-	{
-		const auto git_cve_regex = std::regex(cve_number, std::regex::optimize | std::regex::icase);
-		return std::regex_search(ref_line, git_cve_regex);
-	}
-
-	bool already_has_bsc_ref(const std::string &ref_line, const std::string &bsc_number)
-	{
-		return ref_line.find(bsc_number) != std::string::npos;
-	}
-
-	template<bool trim> std::vector<std::string> read_patch_sans_new_lines(std::istream &f)
-	{
-		std::vector<std::string> ret;
-
-		for (std::string line; std::getline(f, line);)
-			if constexpr (trim)
-				ret.push_back(SlHelpers::String::trim(line));
-			else
-				ret.push_back(line);
-
-		return ret;
-	}
-
-	std::vector<std::string> read_all_patches()
-	{
-		std::string ksource_git;
-		try_to_fetch_env(ksource_git, "KSOURCE_GIT");
-		if (ksource_git.empty())
-			fail_with_message("Please set KSOURCE_GIT!");
-		ksource_git += "/patches.suse";
-		if (!std::filesystem::exists(ksource_git))
-			fail_with_message(ksource_git + " does not exists!");
-
-		std::vector<std::string> ret;
-
-		try {
-			for (const auto &entry: std::filesystem::directory_iterator(ksource_git))
-				ret.push_back(entry.path());
-		} catch (...) {
-			fail_with_message(ksource_git + " cannot be read!");
-		}
-
-		return ret;
-	}
-}
