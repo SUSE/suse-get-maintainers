@@ -260,10 +260,7 @@ void parse_options(int argc, char **argv)
 void show_emails(const Stanza &m, const std::string &)
 {
 	m.for_all_maintainers([](const Person &p) {
-		if (gm.names && !p.name().empty())
-			std::cout << p.name() << " <" << p.email() << ">\n";
-		else
-			std::cout << p.email() << '\n';
+		std::cout << p.pretty(gm.names) << '\n';
 	});
 }
 
@@ -271,10 +268,7 @@ void csv_output(const Stanza &m, const std::string &what)
 {
 	std::cout << what << ',' << '"' << m.name << '"';
 	m.for_all_maintainers([](const Person &p) {
-		if (gm.names && !p.name().empty())
-			std::cout << "," << p.name() << " <" << p.email() << ">";
-		else
-			std::cout << "," << p.email();
+		std::cout << ',' << p.pretty(gm.names);
 	});
 	std::cout << '\n';
 }
@@ -295,8 +289,7 @@ void json_output(const Stanza &m, const std::string &what)
 		if (!first)
 			std::cout << ",\n      ";
 		first = false;
-		const std::string who = gm.names && !p.name().empty() ? p.name() + " <" + p.email() + ">" : p.email();
-		Clr(Clr::GREEN) << Clr::NoNL << std::quoted(who);
+		Clr(Clr::GREEN) << Clr::NoNL << std::quoted(p.pretty(gm.names));
 	});
 	if (backport_counts > 0) {
 		std::cout << "\n    ],\n    ";
@@ -323,12 +316,9 @@ void show_people(const std::vector<Person> &sb, const std::string &what, bool si
 			if (duplicate_set.contains(tmp_email))
 				continue;
 			duplicate_set.insert(tmp_email);
-			if (gm.names)
-				std::cout << p.name() << " <";
-			std::cout << tmp_email; // TODO
-			if (gm.names)
-				std::cout << ">";
-			std::cout << '\n';
+			std::cout << p.pretty([&tmp_email](const std::string &) -> std::string {
+				return tmp_email;
+			}, gm.names) << '\n';
 		}
 	} else if (gm.json) {
 		std::cout << what << ',' << "\n    ";
@@ -351,9 +341,8 @@ void show_people(const std::vector<Person> &sb, const std::string &what, bool si
 			if (!first)
 				std::cout << ",\n      ";
 			first = false;
-			const std::string tmp_email = translate_email(p.email()); // TODO
-			const std::string who = gm.names && !p.name().empty() ? p.name() + " <" + tmp_email + ">" : tmp_email;
-			Clr(Clr::GREEN) << Clr::NoNL << std::quoted(who);
+			Clr(Clr::GREEN) << Clr::NoNL << std::quoted(p.pretty(translate_email,
+									     gm.names));
 		}
 		if (backport_counts > 0) {
 			std::cout << "\n    ],\n    ";
@@ -383,12 +372,8 @@ void show_people(const std::vector<Person> &sb, const std::string &what, bool si
 			if (!first)
 				std::cout << ',';
 			first = false;
-			std::string tmp_email = translate_email(p.email()); // TODO
-			if (gm.names)
-				std::cout << p.name() << " <";
-			std::cout << tmp_email; // TODO
-			if (gm.names)
-				std::cout << ">";
+
+			std::cout << p.pretty(translate_email, gm.names);
 		}
 		std::cout << '\n';
 	}
@@ -419,7 +404,7 @@ bool grep(const std::vector<Stanza> &stanzas, const std::string &grep, bool name
 						std::regex_search(p.name(), re) ||
 						std::regex_search(s.name, re)) {
 					if (names)
-						std::cout << '"' << p.name() << " <" << p.email() << ">\"";
+						std::cout << '"' << p.pretty(true) << '"';
 					else
 						std::cout << p.email();
 					std::cout << ",\"" << s.name << "\"\n";

@@ -58,6 +58,18 @@ public:
 	const std::string email() const { return m_email; }
 	int count() const { return m_count; }
 
+	std::string pretty(bool includeName = true) const {
+		if (includeName && !name().empty())
+			return name() + " <" + email() + ">";
+		return email();
+	}
+	template <typename T>
+	std::string pretty(const T &translate, bool includeName = true) const {
+		if (includeName && !name().empty())
+			return name() + " <" + translate(email()) + ">";
+		return email();
+	}
+
 	void setEmail(const std::string &email) { m_email = email; }
 
 	static std::optional<Person> parsePerson(const std::string_view &src, const Role &role,
