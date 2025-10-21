@@ -104,7 +104,7 @@ int main(int argc, char **argv)
 		auto lines = read_patch_sans_new_lines<false>(file);
 		long sha_idx;
 		const auto sha = get_hash(lines, sha_idx);
-		if (sha.size() != 40 && !is_hex(sha)) {
+		if (sha.size() != 40 || !is_hex(sha)) {
 			emit_message(path_to_patch, " has no valid Git-commit reference (", sha, ")");
 			continue;
 		}
