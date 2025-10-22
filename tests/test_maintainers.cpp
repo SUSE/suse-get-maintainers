@@ -2,6 +2,8 @@
 
 #include "../maintainers.h"
 
+using namespace SGM;
+
 static void test_pattern()
 {
 	{

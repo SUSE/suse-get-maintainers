@@ -5,77 +5,21 @@
 #include <vector>
 #include <fstream>
 #include <sstream>
-#include <algorithm>
 #include <numeric>
 
 #include <sl/git/Repo.h>
 #include <sl/helpers/String.h>
 
 #include "helpers.h"
+#include "Pattern.h"
 #include "Person.h"
 
 namespace {
-	struct Pattern : NonCopyable {
-		Pattern(std::string_view p)
-			{
-				std::string pattern{p};
-				m_weight = pattern_weight(pattern);
-				if (!pattern.empty() && pattern.back() == '/' && pattern.find_first_of('*') != std::string::npos)
-					pattern.push_back('*');
-				const char *ptr = pattern.c_str();
-				const git_strarray array{.strings=const_cast<char **>(&ptr), .count=1};
-				if (git_pathspec_new(&m_pathspec, &array))
-					fail_with_message(git_error_last()->message);
-			}
-		~Pattern() { git_pathspec_free(m_pathspec); }
-		Pattern& operator=(Pattern&& p) = delete;
-		Pattern(Pattern&& p)
-			{
-				m_pathspec = p.m_pathspec;
-				m_weight = p.m_weight;
-				p.m_pathspec = nullptr;
-			}
-		unsigned match(const std::filesystem::path &path) const
-			{
-				if (git_pathspec_matches_path(m_pathspec, GIT_PATHSPEC_DEFAULT, path.c_str()) == 1)
-					return m_weight;
-				return 0;
-			}
-	private:
-		git_pathspec *m_pathspec;
-		unsigned m_weight;
-
-		unsigned pattern_weight(const std::string &pattern)
-			{
-				unsigned ret = 1;
-				bool seen = false;
-				for (const char c: pattern) {
-					switch (c) {
-					case '/':
-						seen = true;
-						break;
-					case ' ':
-					case '\n':
-					case '\t':
-					case '\r':
-					case '\\':
-						break;
-					default:
-						if (seen) {
-							++ret;
-							seen = false;
-						}
-					}
-				}
-				return ret;
-			}
-	};
-
 	struct Stanza {
 		unsigned match_path(const std::filesystem::path &path) const
 			{
 				return std::accumulate(m_patterns.cbegin(), m_patterns.cend(), 0u,
-						       [&path](unsigned m, const Pattern &p) { return std::max(m, p.match(path)); });
+						       [&path](unsigned m, const SGM::Pattern &p) { return std::max(m, p.match(path)); });
 			}
 		void add_maintainer_and_store(const std::string_view maintainer, std::set<std::string> &suse_users)
 			{
@@ -112,7 +56,7 @@ namespace {
 				} else
 					emit_message("Upstream MAINTAINERS: contact ", maintainer, " cannot be parsed into name and email!");
 			}
-		void add_pattern(const std::string_view pattern) { m_patterns.push_back(Pattern(pattern)); }
+		void add_pattern(const std::string_view pattern) { m_patterns.push_back(SGM::Pattern(pattern)); }
 		bool empty() const
 			{
 				return name.empty() || m_maintainers.empty() || m_patterns.empty();
@@ -133,7 +77,7 @@ namespace {
 		std::string name;
 	private:
 		std::vector<SGM::Person> m_maintainers;
-		std::vector<Pattern> m_patterns;
+		std::vector<SGM::Pattern> m_patterns;
 	};
 
 	void load_maintainers_file(std::vector<Stanza> &maintainers, std::set<std::string> &suse_users, const std::string &filename)
