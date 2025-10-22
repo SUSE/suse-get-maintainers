@@ -266,7 +266,7 @@ void show_emails(const Stanza &m, const std::string &)
 
 void csv_output(const Stanza &m, const std::string &what)
 {
-	std::cout << what << ',' << '"' << m.name << '"';
+	std::cout << what << ',' << '"' << m.name() << '"';
 	m.for_all_maintainers([](const Person &p) {
 		std::cout << ',' << p.pretty(gm.names);
 	});
@@ -278,7 +278,7 @@ void json_output(const Stanza &m, const std::string &what)
 	std::cout << what << ',' << "\n    ";
 	Clr(Clr::BLUE) << Clr::NoNL << "\"subsystem\"";
 	std::cout << ": ";
-	Clr(Clr::GREEN) << Clr::NoNL << std::quoted(m.name);
+	Clr(Clr::GREEN) << Clr::NoNL << std::quoted(m.name());
 	std::cout << ",\n    ";
 	Clr(Clr::BLUE) << Clr::NoNL << "\"emails\"";
 	std::cout << ": [\n      ";
@@ -385,7 +385,7 @@ bool whois(const std::vector<Stanza> &stanzas, const std::string &whois)
 	for (const auto& s: stanzas) {
 		s.for_all_maintainers([&s, &whois, &found](const Person &p) {
 			if (p.email() == whois || p.email().starts_with(whois + "@")) {
-				std::cout << s.name << "\n";
+				std::cout << s.name() << "\n";
 				found = true;
 			}
 		});
@@ -402,12 +402,12 @@ bool grep(const std::vector<Stanza> &stanzas, const std::string &grep, bool name
 			try {
 				if (std::regex_search(p.email(), re) ||
 						std::regex_search(p.name(), re) ||
-						std::regex_search(s.name, re)) {
+						std::regex_search(s.name(), re)) {
 					if (names)
 						std::cout << '"' << p.pretty(true) << '"';
 					else
 						std::cout << p.email();
-					std::cout << ",\"" << s.name << "\"\n";
+					std::cout << ",\"" << s.name() << "\"\n";
 					found = true;
 				}
 			} catch (const std::regex_error& e) {
@@ -444,8 +444,8 @@ bool fixes(const std::vector<Stanza> &stanzas, const std::string &grep, bool csv
 			try {
 				if (std::regex_search(p.email(), re) ||
 						std::regex_search(p.name(), re) ||
-						std::regex_search(s.name, re)) {
-					files.insert(maintainer_file_name_from_subsystem(s.name));
+						std::regex_search(s.name(), re)) {
+					files.insert(maintainer_file_name_from_subsystem(s.name()));
 					found = true;
 				}
 			} catch (const std::regex_error& e) {
@@ -585,7 +585,7 @@ void for_all_stanzas(const SQLConn &db,
 
 	if (stanza.has_value()) {
 		if (gm.trace)
-			std::cerr << "STANZA: " << stanza.value()->name << std::endl;
+			std::cerr << "STANZA: " << stanza.value()->name() << std::endl;
 		pp(*stanza.value(), what);
 		return;
 	}
@@ -594,7 +594,7 @@ void for_all_stanzas(const SQLConn &db,
 
 	if (stanza.has_value()) {
 		if (gm.trace)
-			std::cerr << "Upstream STANZA: " << stanza.value()->name << std::endl;
+			std::cerr << "Upstream STANZA: " << stanza.value()->name() << std::endl;
 		pp(*stanza.value(), what);
 		return;
 	}
@@ -624,8 +624,7 @@ void for_all_stanzas(const SQLConn &db,
 			std::sort(emails_and_counts_v.begin(), emails_and_counts_v.end(), [](const GetMaintainers &a, const GetMaintainers &b) {
 				return a.count > b.count;
 			});
-			Stanza s;
-			s.name = "Backporter";
+			Stanza s("Backporter");
 			for (const auto &e: emails_and_counts_v)
 				s.add_backporter("M: Backporter <" + e.email + ">", e.count);
 			if (gm.trace)
@@ -637,7 +636,7 @@ void for_all_stanzas(const SQLConn &db,
 
 	thread_local auto catch_all_maintainer = Stanza{"Base", "F: Kernel Developers at SuSE <kernel@suse.de>"};
 	if (gm.trace)
-		std::cerr << "STANZA: " << catch_all_maintainer.name << std::endl;
+		std::cerr << "STANZA: " << catch_all_maintainer.name() << std::endl;
 	pp(catch_all_maintainer, what);
 }
 
