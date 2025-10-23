@@ -4,6 +4,17 @@
 
 using namespace SGM;
 
+/**
+ * @brief Parse \p src into a Person
+ * @param src Line to parse
+ * @param role Role to set to the new Person
+ * @param count Count to set to the new Person
+ * @return Person, or nullopt in case of failure
+ *
+ * Parses lines like:
+ * M: First LastName <email@somewhere.com>
+ * M: email@somewhere.com
+ */
 std::optional<Person> Person::parsePerson(const std::string_view &src, const Role &role,
 					  unsigned count)
 {
