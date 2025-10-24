@@ -27,6 +27,7 @@ prj_name = meson.project_name()
 executable(prj_name,
   [
     prj_name + '.cc',
+    'Maintainers.cpp',
     'Pattern.cpp',
     'Person.cpp',
   ],

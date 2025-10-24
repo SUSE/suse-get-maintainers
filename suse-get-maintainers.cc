@@ -17,8 +17,8 @@
 
 #include "helpers.h"
 #include "git2.h"
-#include "maintainers.h"
 #include "cve2bugzilla.h"
+#include "Maintainers.h"
 #include "Person.h"
 // TODO
 #include "temporary.h"
@@ -399,7 +399,7 @@ void show_people(const std::vector<Person> &sb, const std::string &what, bool si
 	}
 }
 
-bool whois(const std::vector<Stanza> &stanzas, const std::string &whois)
+bool whois(const Maintainers::MaintainersType &stanzas, const std::string &whois)
 {
 	bool found = false;
 	for (const auto& s: stanzas) {
@@ -413,7 +413,7 @@ bool whois(const std::vector<Stanza> &stanzas, const std::string &whois)
 	return found;
 }
 
-bool grep(const std::vector<Stanza> &stanzas, const std::string &grep, bool names)
+bool grep(const Maintainers::MaintainersType &stanzas, const std::string &grep, bool names)
 {
 	const auto re = std::regex(grep, std::regex::icase | std::regex::optimize);
 	bool found = false;
@@ -595,13 +595,12 @@ struct GetMaintainers
 
 template<typename F>
 void for_all_stanzas(const SQLConn &db,
-		     const std::vector<Stanza> &suse_stanzas,
-		     const std::vector<Stanza> &upstream_stanzas,
+		     const Maintainers &maintainers,
 		     const std::set<std::filesystem::path> &paths,
 		     F pp,
 		     const std::string &what)
 {
-	std::optional<const Stanza *> stanza = find_best_match(suse_stanzas, paths);
+	std::optional<const Stanza *> stanza = find_best_match(maintainers.maintainers(), paths);
 
 	if (stanza.has_value()) {
 		if (gm.trace)
@@ -610,7 +609,7 @@ void for_all_stanzas(const SQLConn &db,
 		return;
 	}
 
-	stanza = find_best_match(upstream_stanzas, paths);
+	stanza = find_best_match(maintainers.upstream_maintainers(), paths);
 
 	if (stanza.has_value()) {
 		if (gm.trace)
@@ -675,7 +674,7 @@ void handleInit()
 	}
 }
 
-void handleFixes(const std::vector<Stanza> &maintainers)
+void handleFixes(const Maintainers::MaintainersType &maintainers)
 {
 	SlCVEs::CVEHashMap cve_hash_map{SlCVEs::CVEHashMap::ShaSize::Short, gm.cve_branch, gm.year,
 				gm.rejected};
@@ -694,19 +693,17 @@ void handleFixes(const std::vector<Stanza> &maintainers)
 				  " in maintainers or subsystems");
 }
 
-void handleWhois(const std::vector<Stanza> &maintainers,
-		 const std::vector<Stanza> &upstream_maintainers)
+void handleWhois(const Maintainers &maintainers)
 {
-	if (!whois(maintainers, gm.whois))
-		if (!whois(upstream_maintainers, gm.whois))
+	if (!whois(maintainers.maintainers(), gm.whois))
+		if (!whois(maintainers.upstream_maintainers(), gm.whois))
 			fail_with_message("unable to find " + gm.whois + " among maintainers");
 }
 
-void handleGrep(const std::vector<Stanza> &maintainers,
-		const std::vector<Stanza> &upstream_maintainers)
+void handleGrep(const Maintainers &maintainers)
 {
-	if (!grep(maintainers, gm.grep, gm.names))
-		if (!grep(upstream_maintainers, gm.grep, gm.names))
+	if (!grep(maintainers.maintainers(), gm.grep, gm.names))
+		if (!grep(maintainers.upstream_maintainers(), gm.grep, gm.names))
 			fail_with_message("unable to find a match for " + gm.grep +
 					  " in maintainers or subsystems");
 }
@@ -719,9 +716,7 @@ void handleRefresh()
 		fetch_repo(gm.kernel_tree, gm.origin);
 }
 
-void handlePaths(const std::vector<Stanza> &maintainers,
-		 const std::vector<Stanza> &upstream_maintainers,
-		 const SQLConn &db)
+void handlePaths(const Maintainers &maintainers, const SQLConn &db)
 {
 	if (gm.from_stdin)
 		gm.paths = read_stdin_sans_new_lines<std::filesystem::path>();
@@ -742,13 +737,13 @@ void handlePaths(const std::vector<Stanza> &maintainers,
 				Clr(what, Clr::GREEN) << Clr::NoNL << '"' << p << '"';
 			} else
 				what << p;
-			for_all_stanzas(db, maintainers, upstream_maintainers, {p},
+			for_all_stanzas(db, maintainers, {p},
 					gm.json ? json_output : csv_output, what.str());
 		}
 		if (gm.json)
 			std::cout << "\n]\n";
 	} else
-		for_all_stanzas(db, maintainers, upstream_maintainers, gm.paths, show_emails, "");
+		for_all_stanzas(db, maintainers, gm.paths, show_emails, "");
 }
 
 std::variant<std::set<std::filesystem::path>, std::vector<Person>>
@@ -796,10 +791,7 @@ get_paths_from_patch(const std::filesystem::path &path, const std::set<std::stri
 	return ret;
 }
 
-void handleDiffs(const std::vector<Stanza> &maintainers,
-		 const std::vector<Stanza> &upstream_maintainers,
-		 const std::set<std::string> &suse_users,
-		 const SQLConn &db)
+void handleDiffs(const Maintainers &maintainers, const SQLConn &db)
 {
 	if (gm.from_stdin)
 		gm.diffs = read_stdin_sans_new_lines<std::filesystem::path>();
@@ -810,7 +802,8 @@ void handleDiffs(const std::vector<Stanza> &maintainers,
 		bool first = true;
 		for (const auto &ps: gm.diffs) {
 			try {
-				auto s = get_paths_from_patch(ps, suse_users, gm.only_maintainers);
+				auto s = get_paths_from_patch(ps, maintainers.suse_users(),
+							      gm.only_maintainers);
 				if (gm.trace && std::holds_alternative<std::set<std::filesystem::path>>(s)) {
 
 					std::cerr << "patch " << ps << " contains the following paths: " << std::endl;
@@ -832,7 +825,7 @@ void handleDiffs(const std::vector<Stanza> &maintainers,
 					const std::vector<Person> sb = std::get<std::vector<Person>>(s);
 					show_people(sb, what.str(), false);
 				} else
-					for_all_stanzas(db, maintainers, upstream_maintainers,
+					for_all_stanzas(db, maintainers,
 							std::get<std::set<std::filesystem::path>>(s),
 							gm.json ? json_output : csv_output,
 							what.str());
@@ -843,7 +836,8 @@ void handleDiffs(const std::vector<Stanza> &maintainers,
 		return;
 	}
 
-	auto s = get_paths_from_patch(*gm.diffs.cbegin(), suse_users, gm.only_maintainers);
+	auto s = get_paths_from_patch(*gm.diffs.cbegin(), maintainers.suse_users(),
+				      gm.only_maintainers);
 	if (gm.trace && std::holds_alternative<std::set<std::filesystem::path>>(s)) {
 		std::cerr << "patch " << *gm.diffs.cbegin() << " contains the following paths: " <<
 			     std::endl;
@@ -854,7 +848,7 @@ void handleDiffs(const std::vector<Stanza> &maintainers,
 		const std::vector<Person> sb = std::get<std::vector<Person>>(s);
 		show_people(sb, "", true);
 	} else
-		for_all_stanzas(db, maintainers, upstream_maintainers,
+		for_all_stanzas(db, maintainers,
 				std::get<std::set<std::filesystem::path>>(s), show_emails, "");
 }
 
@@ -907,9 +901,7 @@ void handleCVEs(SlCVEs::CVEHashMap &cve_hash_map)
 	}
 }
 
-void handleSHAs(const std::vector<Stanza> &maintainers,
-		const std::vector<Stanza> &upstream_maintainers,
-		const std::set<std::string> &suse_users,
+void handleSHAs(const Maintainers &maintainers,
 		const SlCVEs::CVEHashMap &cve_hash_map,
 		const SQLConn &db,
 		bool has_cves)
@@ -932,8 +924,8 @@ void handleSHAs(const std::vector<Stanza> &maintainers,
 	if (gm.json)
 		std::cout << "[\n";
 
-	search_commit(*rkOpt, gm.shas, suse_users, gm.only_maintainers, gm.trace,
-		      [&maintainers, &upstream_maintainers, &has_cves, &first, &cve_hash_map, &db, simple]
+	search_commit(*rkOpt, gm.shas, maintainers.suse_users(), gm.only_maintainers, gm.trace,
+		      [&maintainers, &has_cves, &first, &cve_hash_map, &db, simple]
 		      (const std::string &sha, const std::vector<Person> &sb,
 		       const std::set<std::filesystem::path> &paths) {
 		if (gm.trace && !paths.empty()) {
@@ -966,7 +958,7 @@ void handleSHAs(const std::vector<Stanza> &maintainers,
 		if (!sb.empty()) {
 			show_people(sb, what.str(), simple);
 		} else
-			for_all_stanzas(db, maintainers, upstream_maintainers, paths,
+			for_all_stanzas(db, maintainers, paths,
 					simple ? show_emails : gm.json ? json_output : csv_output,
 					what.str());
 	});
@@ -982,10 +974,6 @@ int main(int argc, char **argv)
 
 	std::cin.tie(nullptr);
 	std::ios::sync_with_stdio(false);
-
-	std::vector<Stanza> maintainers;
-	std::vector<Stanza> upstream_maintainers;
-	std::set<std::string> suse_users;
 
 	parse_options(argc, argv);
 	Clr::forceColor(true);
@@ -1026,23 +1014,22 @@ int main(int argc, char **argv)
 	try_to_fetch_env(gm.vulns, "VULNS_GIT");
 	try_to_fetch_env(gm.kernel_tree, "LINUX_GIT");
 
-	load_maintainers_file(maintainers, suse_users, gm.maintainers, translateEmail);
-	if (!gm.kernel_tree.empty())
-		load_upstream_maintainers_file(upstream_maintainers, suse_users, gm.kernel_tree,
-					       gm.origin, translateEmail);
+	const auto m = Maintainers::load(gm.maintainers, gm.kernel_tree, gm.origin, translateEmail);
+	if (!m)
+		throw 1;
 
 	if (!gm.fixes.empty()) {
-		handleFixes(maintainers);
+		handleFixes(m->maintainers());
 		return 0;
 	}
 
 	if (!gm.whois.empty()) {
-		handleWhois(maintainers, upstream_maintainers);
+		handleWhois(*m);
 		return 0;
 	}
 
 	if (!gm.grep.empty()) {
-		handleGrep(maintainers, upstream_maintainers);
+		handleGrep(*m);
 		return 0;
 	}
 
@@ -1055,12 +1042,12 @@ int main(int argc, char **argv)
 			fail_with_message("Failed to open db: ", gm.conf_file_map);
 
 	if (!gm.paths.empty()) {
-		handlePaths(maintainers, upstream_maintainers, db);
+		handlePaths(*m, db);
 		return 0;
 	}
 
 	if (!gm.diffs.empty()) {
-		handleDiffs(maintainers, upstream_maintainers, suse_users, db);
+		handleDiffs(*m, db);
 		return 0;
 	}
 
@@ -1074,8 +1061,7 @@ int main(int argc, char **argv)
 	}
 
 	if (!gm.shas.empty()) {
-		handleSHAs(maintainers, upstream_maintainers, suse_users, cve_hash_map, db,
-			   has_cves);
+		handleSHAs(*m, cve_hash_map, db, has_cves);
 		return 0;
 	}
 
