@@ -2,6 +2,7 @@
 #define SGM_CVE2BUGZILLA_H
 
 #include <filesystem>
+#include <iostream>
 #include <unordered_map>
 #include <string>
 #include <string_view>
@@ -9,10 +10,8 @@
 
 #include <sl/helpers/String.h>
 
-#include "helpers.h"
-
 namespace {
-	struct CVE2Bugzilla : NonCopyable {
+	struct CVE2Bugzilla {
 		CVE2Bugzilla() {}
 
 		bool load(const std::filesystem::path &cve2bugzilla);
@@ -27,8 +26,10 @@ namespace {
 	{
 		std::ifstream file{cve2bugzilla};
 
-		if (!file.is_open())
-			fail_with_message("Unable to open cve2bugzilla.txt file: ", cve2bugzilla);
+		if (!file.is_open()) {
+			std::cerr << "Unable to open cve2bugzilla.txt file: " << cve2bugzilla << '\n';
+			return false;
+		}
 
 		for (std::string line; getline(file, line);) {
 			if (line.find("EMBARGOED") != std::string::npos
@@ -40,13 +41,13 @@ namespace {
 			    || cve_end_idx < 10
 			    || bsc_begin_idx == std::string::npos
 			    || bsc_begin_idx + 1 == std::string::npos) {
-				emit_message("user-bugzilla-map.txt: ", line);
+				std::cerr << "user-bugzilla-map.txt: " << line << '\n';
 				continue;
 			}
 			std::string_view cve_number = SlHelpers::String::trim(std::string_view(line).substr(0, cve_end_idx));
 			std::string_view bsc_number = SlHelpers::String::trim(std::string_view(line).substr(bsc_begin_idx + 1));
 			if (cve_number.empty() || bsc_number.empty()) {
-				emit_message("user-bugzilla-map.txt: ", line);
+				std::cerr << "user-bugzilla-map.txt: " << line << '\n';
 				continue;
 			}
 			std::string bug{"bsc#"};
