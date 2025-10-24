@@ -20,9 +20,6 @@
 #include "cve2bugzilla.h"
 #include "Maintainers.h"
 #include "Person.h"
-// TODO
-#include "temporary.h"
-// END TODO
 
 using namespace SGM;
 using Clr = SlHelpers::Color;
@@ -118,6 +115,34 @@ std::size_t get_soft_limit_for_opened_files(std::size_t min_limit)
 #include <unordered_map>
 std::unordered_map<std::string, std::string> translation_table;
 bool do_not_translate = false;
+
+bool load_temporary(std::unordered_map<std::string, std::string> &h,
+		    const std::filesystem::path &filename)
+{
+	std::ifstream file{filename};
+
+	if (!file.is_open())
+		std::cerr << "Unable to open user-bugzilla-map.txt file: " << filename << '\n';
+
+	for (std::string line; getline(file, line);) {
+		if (line.empty() || line[0] == ';' || line[0] == ' ')
+			continue;
+		const auto equal_sign_idx = line.find_first_of("=");
+		if (equal_sign_idx == std::string::npos) {
+			std::cerr << "user-bugzilla-map.txt: " << line << '\n';
+			continue;
+		}
+		const auto user = SlHelpers::String::trim(std::string_view(line).substr(0, equal_sign_idx));
+		const auto bz_user = SlHelpers::String::trim(std::string_view(line).substr(equal_sign_idx + 1));
+		if (user.empty() || bz_user.empty()) {
+			std::cerr << "user-bugzilla-map.txt: " << line << '\n';
+			continue;
+		}
+		h.insert(std::make_pair(user, bz_user));
+	}
+
+	return true;
+}
 
 std::string translateEmail(const std::string_view &sv)
 {
@@ -999,7 +1024,8 @@ int main(int argc, char **argv)
 								  "https://kerncvs.suse.de/user-bugzilla-map.txt",
 								  gm.refresh, false,
 								  std::chrono::hours{12});
-	load_temporary(translation_table, temporary);
+	if (!load_temporary(translation_table, temporary))
+		throw 1;
 	// END TODO
 
 	const std::size_t libgit2_limit_opened_files = (get_soft_limit_for_opened_files(min_total_opened_files) - tracking_fixes_opened_files) / libgit2_opened_files_factor;
