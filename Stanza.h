@@ -3,9 +3,12 @@
 
 #include <filesystem>
 #include <numeric>
+#include <set>
 
 #include "Pattern.h"
 #include "Person.h"
+
+#include "helpers.h"
 
 namespace SGM {
 
@@ -63,8 +66,12 @@ public:
 				     " cannot be parsed into name and email!");
 	}
 
-	void add_pattern(const std::string_view &pattern) {
-		m_patterns.push_back(Pattern(pattern));
+	bool add_pattern(const std::string_view &pattern) {
+		auto p = Pattern::create(pattern);
+		if (!p)
+			return false;
+		m_patterns.push_back(std::move(*p));
+		return true;
 	}
 
 	bool empty() const {

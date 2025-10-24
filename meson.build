@@ -25,7 +25,11 @@ sqlite3 = dependency('slsqlite++')
 
 prj_name = meson.project_name()
 executable(prj_name,
-  [ prj_name + '.cc', 'Person.cpp' ],
+  [
+    prj_name + '.cc',
+    'Pattern.cpp',
+    'Person.cpp',
+  ],
   implicit_include_directories: false,
   dependencies: [ cxxopts, libcves, libcurl, libgit2, sqlite3 ],
   install: true,

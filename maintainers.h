@@ -34,7 +34,8 @@ namespace SGM {
 					if (fpattern.empty())
 						emit_message("MAINTAINERS entry: ", tmp);
 					else
-						st.add_pattern(fpattern);
+						if (!st.add_pattern(fpattern))
+							throw 1;
 				}
 			} else {
 				if (!st.empty())
@@ -97,7 +98,8 @@ namespace SGM {
 					if (fpattern.empty())
 						emit_message("Upstream MAINTAINERS entry: ", line);
 					else
-						st.add_pattern(fpattern);
+						if (!st.add_pattern(fpattern))
+							throw 1;
 					break;
 				}
 			else {

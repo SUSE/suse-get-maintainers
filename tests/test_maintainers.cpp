@@ -1,45 +1,52 @@
 #include <cassert>
 
-#include "../maintainers.h"
+#include "../Pattern.h"
+#include "../Stanza.h"
 
 using namespace SGM;
 
 static void test_pattern()
 {
 	{
-		Pattern p{"drivers/char/tpm/"};
-		assert(!p.match("drivers/char/a.c"));
-		assert(p.match("drivers/char/tpm/a.c") == 3);
+		auto p = Pattern::create("drivers/char/tpm/");
+		assert(p);
+		assert(!p->match("drivers/char/a.c"));
+		assert(p->match("drivers/char/tpm/a.c") == 3);
 	}
 
 	{
-		Pattern p{"drivers/char/"};
-		assert(p.match("drivers/char/a.c") == 2);
+		const auto p = Pattern::create("drivers/char/");
+		assert(p);
+		assert(p->match("drivers/char/a.c") == 2);
 	}
 
 	{
-		Pattern p{"drivers/*"};
-		assert(!p.match("driver/char/a.c"));
-		assert(p.match("drivers/char/ttt/a.c") == 2);
+		const auto p = Pattern::create("drivers/*");
+		assert(p);
+		assert(!p->match("driver/char/a.c"));
+		assert(p->match("drivers/char/ttt/a.c") == 2);
 	}
 
 	{
-		Pattern p{"drivers/*/b.c"};
-		assert(!p.match("drivers/char/tpm/a.c"));
-		assert(p.match("drivers/char/tpm/b.c") == 3);
+		const auto p = Pattern::create("drivers/*/b.c");
+		assert(p);
+		assert(!p->match("drivers/char/tpm/a.c"));
+		assert(p->match("drivers/char/tpm/b.c") == 3);
 	}
 
 	{
-		Pattern p{"*/b.c"};
-		assert(p.match("drivers/char/tpm/b.c") == 2);
-		assert(!p.match("drivers/char/tpm/a.c"));
+		const auto p = Pattern::create("*/b.c");
+		assert(p);
+		assert(p->match("drivers/char/tpm/b.c") == 2);
+		assert(!p->match("drivers/char/tpm/a.c"));
 	}
 
 	{
-		Pattern p{"drivers/char/?.c"};
-		assert(p.match("drivers/char/a.c"));
-		assert(p.match("drivers/char/b.c"));
-		assert(!p.match("drivers/char/b.h"));
+		const auto p = Pattern::create("drivers/char/?.c");
+		assert(p);
+		assert(p->match("drivers/char/a.c"));
+		assert(p->match("drivers/char/b.c"));
+		assert(!p->match("drivers/char/b.h"));
 	}
 }
 

@@ -1,12 +1,12 @@
 # SPDX-License-Identifier: GPL-2.0-only
 
 tests = {
-  'maintainers' : [ libgit2 ],
+  'maintainers' : { 'libs': [ libgit2 ], 'sources': [ '../Pattern.cpp' ] },
 }
 
 foreach t : tests.keys()
-  test(t, executable('test_' + t, 'test_' + t + '.cpp',
-    dependencies: tests[t],
+  test(t, executable('test_' + t, [ 'test_' + t + '.cpp', tests[t]['sources'] ],
+    dependencies: tests[t]['libs'],
     implicit_include_directories: false,
   ))
 endforeach
