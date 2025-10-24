@@ -735,10 +735,10 @@ void handleGrep(const Maintainers &maintainers)
 
 void handleRefresh()
 {
-	if (!gm.vulns.empty())
-		fetch_repo(gm.vulns, "origin");
-	if (!gm.kernel_tree.empty())
-		fetch_repo(gm.kernel_tree, gm.origin);
+	if (!gm.vulns.empty() && !SlGit::Repo::update(gm.vulns, "origin"))
+		throw 1;
+	if (!gm.kernel_tree.empty() && !SlGit::Repo::update(gm.kernel_tree, gm.origin))
+		throw 1;
 }
 
 void handlePaths(const Maintainers &maintainers, const SQLConn &db)

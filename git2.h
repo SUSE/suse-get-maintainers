@@ -175,38 +175,6 @@ namespace {
 			pp(s, sb, paths);
 		}
 	}
-
-	void print_stats(const SlGit::Remote &remote)
-	{
-		const auto stats = remote.stats();
-		if (stats->local_objects > 0)
-			std::cerr << "Received " << stats->indexed_objects << '/' <<
-				     stats->total_objects << " objects in " <<
-				     SlHelpers::Unit::human(stats->received_bytes) <<
-				     " (used " << stats->local_objects << " local objects)\n";
-		else
-			std::cerr << "Received " << stats->indexed_objects << '/' <<
-				     stats->total_objects << " objects in " <<
-				     SlHelpers::Unit::human(stats->received_bytes) << '\n';
-	}
-
-	void fetch_repo(const std::filesystem::path &repo_path, const std::string &name)
-	{
-		emit_message("Trying to fetch... ", name, " in ", repo_path);
-		auto repoOpt = SlGit::Repo::open(repo_path);
-		if (!repoOpt)
-			fail_with_message(git_error_last()->message);
-
-		auto remoteOpt = repoOpt->remoteLookup(name);
-		if (!remoteOpt)
-			fail_with_message(git_error_last()->message);
-
-		if (remoteOpt->fetchRefspecs())
-			fail_with_message(git_error_last()->message);
-
-		print_stats(*remoteOpt);
-	}
-
 }
 
 #endif
