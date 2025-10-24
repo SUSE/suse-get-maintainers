@@ -4,16 +4,9 @@
 #include <iostream>
 #include <cstdlib>
 #include <set>
-#include <string_view>
 #include <sys/resource.h>
 
 #include <sl/helpers/String.h>
-
-// TODO
-#include <unordered_map>
-std::unordered_map<std::string, std::string> translation_table;
-bool do_not_translate = false;
-// END TODO
 
 #define SGM_BEGIN try {
 #define SGM_END } catch (int ret) { return ret; } catch (...) { return 42; }
@@ -52,22 +45,6 @@ namespace {
 				var = ptr;
 		}
 	}
-
-	// TODO
-	std::string translate_email(std::string_view sv)
-	{
-		if (do_not_translate || sv.starts_with("kernel-cvs@") || sv.starts_with("kernel@"))
-			return std::string(sv);
-		const std::string key = std::string(sv.substr(0, sv.find("@")));
-		const auto it = translation_table.find(key);
-		if (it != translation_table.cend()) {
-			if (it->second.find("@") == std::string::npos)
-				return it->second + "@suse.com";
-			return it->second;
-		}
-		return key + "@suse.com";
-	}
-	// END TODO
 }
 
 #endif

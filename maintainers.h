@@ -14,7 +14,9 @@
 
 namespace SGM {
 
-	void load_maintainers_file(std::vector<Stanza> &maintainers, std::set<std::string> &suse_users, const std::string &filename)
+	void load_maintainers_file(std::vector<Stanza> &maintainers,
+				   std::set<std::string> &suse_users, const std::string &filename,
+				   const Stanza::TranslateEmail &translateEmail)
 	{
 		std::ifstream file{filename};
 
@@ -28,7 +30,7 @@ namespace SGM {
 				continue;
 			if (tmp[1] == ':') {
 				if (tmp[0] == 'M')
-					st.add_maintainer_and_store(tmp, suse_users);
+					st.add_maintainer_and_store(tmp, suse_users, translateEmail);
 				else if (tmp[0] == 'F') {
 					const auto fpattern = SlHelpers::String::trim(tmp.substr(2));
 					if (fpattern.empty())
@@ -50,7 +52,10 @@ namespace SGM {
 			fail_with_message(filename, " appears to be empty");
 	}
 
-	void load_upstream_maintainers_file(std::vector<Stanza> &stanzas, const std::set<std::string> &suse_users, const std::string &lsource, const std::string &origin)
+	void load_upstream_maintainers_file(std::vector<Stanza> &stanzas,
+					    const std::set<std::string> &suse_users,
+					    const std::string &lsource, const std::string &origin,
+					    const Stanza::TranslateEmail &translateEmail)
 	{
 		auto linux_repo = SlGit::Repo::open(lsource);
 		if (!linux_repo)
@@ -91,7 +96,7 @@ namespace SGM {
 					break;
 				case 'M':
 				case 'R':
-					st.add_maintainer_if(line, suse_users);
+					st.add_maintainer_if(line, suse_users, translateEmail);
 					break;
 				case 'F':
 					const auto fpattern = SlHelpers::String::trim(std::string_view(line).substr(2));

@@ -114,6 +114,26 @@ std::size_t get_soft_limit_for_opened_files(std::size_t min_limit)
 	return 1024;
 }
 
+// TODO
+#include <unordered_map>
+std::unordered_map<std::string, std::string> translation_table;
+bool do_not_translate = false;
+
+std::string translateEmail(const std::string_view &sv)
+{
+	if (do_not_translate || sv.starts_with("kernel-cvs@") || sv.starts_with("kernel@"))
+		return std::string(sv);
+	const std::string key = std::string(sv.substr(0, sv.find("@")));
+	const auto it = translation_table.find(key);
+	if (it != translation_table.cend()) {
+		if (it->second.find("@") == std::string::npos)
+			return it->second + "@suse.com";
+		return it->second;
+	}
+	return key + "@suse.com";
+}
+// END TODO
+
 template <typename T>
 void moveVecToSet(const std::vector<T> &vec, std::set<T> &set) {
 	set.insert(std::make_move_iterator(vec.begin()), std::make_move_iterator(vec.end()));
@@ -312,7 +332,7 @@ void show_people(const std::vector<Person> &sb, const std::string &what, bool si
 	if (simple) {
 		std::set<std::string> duplicate_set;
 		for (const Person &p: sb) {
-			std::string tmp_email = translate_email(p.email()); // TODO
+			std::string tmp_email = translateEmail(p.email()); // TODO
 			if (duplicate_set.contains(tmp_email))
 				continue;
 			duplicate_set.insert(tmp_email);
@@ -341,7 +361,7 @@ void show_people(const std::vector<Person> &sb, const std::string &what, bool si
 			if (!first)
 				std::cout << ",\n      ";
 			first = false;
-			Clr(Clr::GREEN) << Clr::NoNL << std::quoted(p.pretty(translate_email,
+			Clr(Clr::GREEN) << Clr::NoNL << std::quoted(p.pretty(translateEmail,
 									     gm.names));
 		}
 		if (backport_counts > 0) {
@@ -373,7 +393,7 @@ void show_people(const std::vector<Person> &sb, const std::string &what, bool si
 				std::cout << ',';
 			first = false;
 
-			std::cout << p.pretty(translate_email, gm.names);
+			std::cout << p.pretty(translateEmail, gm.names);
 		}
 		std::cout << '\n';
 	}
@@ -626,7 +646,8 @@ void for_all_stanzas(const SQLConn &db,
 			});
 			Stanza s("Backporter");
 			for (const auto &e: emails_and_counts_v)
-				s.add_backporter("M: Backporter <" + e.email + ">", e.count);
+				s.add_backporter("M: Backporter <" + e.email + ">", e.count,
+						 translateEmail);
 			if (gm.trace)
 				std::cerr << "Backporters:" << std::endl;
 			pp(s, what);
@@ -1005,9 +1026,10 @@ int main(int argc, char **argv)
 	try_to_fetch_env(gm.vulns, "VULNS_GIT");
 	try_to_fetch_env(gm.kernel_tree, "LINUX_GIT");
 
-	load_maintainers_file(maintainers, suse_users, gm.maintainers);
+	load_maintainers_file(maintainers, suse_users, gm.maintainers, translateEmail);
 	if (!gm.kernel_tree.empty())
-		load_upstream_maintainers_file(upstream_maintainers, suse_users, gm.kernel_tree, gm.origin);
+		load_upstream_maintainers_file(upstream_maintainers, suse_users, gm.kernel_tree,
+					       gm.origin, translateEmail);
 
 	if (!gm.fixes.empty()) {
 		handleFixes(maintainers);

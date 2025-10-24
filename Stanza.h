@@ -2,18 +2,21 @@
 #define SGM_STANZA_H
 
 #include <filesystem>
+#include <functional>
+#include <iostream>
 #include <numeric>
 #include <set>
+#include <vector>
 
 #include "Pattern.h"
 #include "Person.h"
-
-#include "helpers.h"
 
 namespace SGM {
 
 class Stanza {
 public:
+	using TranslateEmail = std::function<std::string (const std::string_view &sv)>;
+
 	Stanza() = default;
 	Stanza(const std::string &name) : m_name(name) {}
 	Stanza(const std::string &n, const std::string &who) : m_name(n) {
@@ -29,41 +32,43 @@ public:
 	}
 
 	void add_maintainer_and_store(const std::string_view &maintainer,
-				      std::set<std::string> &suse_users) {
+				      std::set<std::string> &suse_users,
+				      const TranslateEmail &translateEmail) {
 		if (auto m = Person::parsePerson(maintainer, Role::Maintainer)) {
 			suse_users.insert(m->email().substr(0, m->email().find_first_of("@")));
 			// TODO
-			m->setEmail(translate_email(m->email()));
+			m->setEmail(translateEmail(m->email()));
 			// END TODO
 			m_maintainers.push_back(std::move(*m));
 		} else
-			emit_message("MAINTAINERS: contact ", maintainer,
-				     " cannot be parsed into name and email!");
+			std::cerr << "MAINTAINERS: contact " << maintainer <<
+				     " cannot be parsed into name and email!\n";
 	}
 
-	void add_backporter(const std::string_view &maintainer, int cnt)
-	{
+	void add_backporter(const std::string_view &maintainer, int cnt,
+			    const TranslateEmail &translateEmail) {
 		if (auto m = Person::parsePerson(maintainer, Role::Maintainer, cnt)) {
 			// TODO
-			m->setEmail(translate_email(m->email()));
+			m->setEmail(translateEmail(m->email()));
 			// END TODO
 			m_maintainers.push_back(std::move(*m));
 		} else
-			emit_message("MAINTAINERS: contact ", maintainer,
-				     " cannot be parsed into name and email!");
+			std::cerr << "MAINTAINERS: contact " << maintainer <<
+				     " cannot be parsed into name and email!\n";
 	}
 
 	void add_maintainer_if(const std::string_view maintainer,
-			       const std::set<std::string> &suse_users) {
+			       const std::set<std::string> &suse_users,
+			       const TranslateEmail &translateEmail) {
 		if (auto m = Person::parsePerson(maintainer, Role::Upstream)) {
 			// TODO
-			m->setEmail(translate_email(m->email()));
+			m->setEmail(translateEmail(m->email()));
 			// END TODO
 			if (suse_users.contains(m->email().substr(0, m->email().find("@"))))
 				m_maintainers.push_back(std::move(*m));
 		} else
-			emit_message("Upstream MAINTAINERS: contact ", maintainer,
-				     " cannot be parsed into name and email!");
+			std::cerr << "Upstream MAINTAINERS: contact " << maintainer <<
+				     " cannot be parsed into name and email!\n";
 	}
 
 	bool add_pattern(const std::string_view &pattern) {
