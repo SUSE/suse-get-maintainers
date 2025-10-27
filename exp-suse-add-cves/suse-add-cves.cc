@@ -14,9 +14,12 @@
 #include <sl/cves/CVE2Bugzilla.h>
 #include <sl/cves/CVEHashMap.h>
 #include <sl/git/Repo.h>
+#include <sl/helpers/Color.h>
 #include <sl/helpers/String.h>
 
 #include "helpers.h"
+
+using Clr = SlHelpers::Color;
 
 namespace {
 
@@ -153,7 +156,8 @@ int main(int argc, char **argv)
 		if (!gm.vulns.empty()) {
 			if (!SlGit::Repo::clone(gm.vulns, "https://git.kernel.org/pub/scm/linux/security/vulns.git"))
 				fail_with_message(git_error_last()->message);
-			emit_message("\n\nexport VULNS_GIT=", gm.vulns, " # store into ~/.bashrc\n\n");
+			std::cout << "\n\nexport VULNS_GIT=" << gm.vulns <<
+				     " # store into ~/.bashrc\n\n\n";
 		}
 		return 0;
 	}
@@ -203,7 +207,7 @@ int main(int argc, char **argv)
 
 		std::ifstream file(path_to_patch);
 		if (!file.is_open()) {
-			emit_message("Cannot open file: ", path_to_patch);
+			Clr(std::cerr, Clr::RED) << "Cannot open file: " << path_to_patch;
 			continue;
 		}
 
@@ -211,7 +215,9 @@ int main(int argc, char **argv)
 		long sha_idx;
 		const auto sha = get_hash(lines, sha_idx);
 		if (sha.size() != 40 || !SlHelpers::String::isHex(sha)) {
-			emit_message(path_to_patch, " has no valid Git-commit reference (", sha, ")");
+			Clr(std::cerr, Clr::YELLOW) << path_to_patch <<
+						    " has no valid Git-commit reference (" <<
+						    sha << ")";
 			continue;
 		}
 
@@ -237,7 +243,7 @@ int main(int argc, char **argv)
 
 		std::ofstream new_file(new_patch);
 		if (!new_file.is_open()) {
-			emit_message("Cannot open file: ", new_patch);
+			Clr(std::cerr, Clr::RED) << "Cannot open file: " << new_patch;
 			continue;
 		}
 

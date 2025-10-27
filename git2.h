@@ -19,7 +19,9 @@ namespace {
 	{
 		for (auto &str: s)
 			if (!SlHelpers::String::isHex(str) || (str.size() > 40 || str.size() < min))
-				emit_message(str, " does not seem to be a SHA hash of at least ", min, " characters long");
+				std::cerr << str <<
+					     " does not seem to be a SHA hash of at least " <<
+					     min << " characters long\n";
 	}
 
 	std::vector<SGM::Person> get_somebody_else(const SlGit::Commit &commit,
@@ -158,7 +160,8 @@ namespace {
 				sb = get_somebody_else(*commit, suse_users);
 				if (!sb.empty()) {
 					if (trace)
-						emit_message("SHA ", s," contains directly our people: skipping maintainers file (supress this with -M)!");
+						std::cerr << "SHA " << s <<
+							     " contains directly our people: skipping maintainers file (suppress this with -M)!\n";
 					pp(s, sb, paths);
 					continue;
 				}
@@ -166,7 +169,8 @@ namespace {
 
 			auto parent = commit->parent();
 			if (!parent) {
-				emit_message(git_error_last()->message);
+				std::cerr << "cannot find commit's parent: " <<
+					     git_error_last()->message << '\n';
 				continue;
 			}
 

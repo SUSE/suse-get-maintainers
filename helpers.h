@@ -18,11 +18,6 @@ namespace {
 		throw 1;
 	}
 
-	template<typename... Args> void emit_message(Args&&... args)
-	{
-		(std::cerr << ... << args) << std::endl;
-	}
-
 	bool is_suse_address([[maybe_unused]] const std::set<std::string> &users, const std::string &email)
 	{
 		return (email.ends_with("@suse.com") || email.ends_with("@suse.cz") || email.ends_with("@suse.de"));

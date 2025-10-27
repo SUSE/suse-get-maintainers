@@ -107,7 +107,7 @@ std::size_t get_soft_limit_for_opened_files(std::size_t min_limit)
 			fail_with_message("RLIMIT_NOFILE is less than ", min_limit, ".  Please bump it!");
 		return rl.rlim_cur;
 	}
-	emit_message("getrlimit");
+	Clr(std::cerr, Clr::YELLOW) << "getrlimit() failed: " << strerror(errno);
 	return 1024;
 }
 
@@ -506,7 +506,7 @@ bool fixes(const std::vector<Stanza> &stanzas, const std::string &grep, bool csv
 			std::cout << "--------------------------------------------------------------------------------\n";
 		if (!mf_on_the_disk.empty()) {
 			if (trace)
-				emit_message(mf_on_the_disk);
+				std::cerr << mf_on_the_disk << '\n';
 			std::ifstream file{mf_on_the_disk};
 			if (!file.is_open())
 				fail_with_message("Unable to open file: ", mf_on_the_disk);
@@ -690,12 +690,13 @@ void handleInit()
 	if (!gm.kernel_tree.empty()) {
 		if (!SlGit::Repo::clone(gm.kernel_tree, "https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git"))
 			fail_with_message(git_error_last()->message);
-		emit_message("\n\nexport LINUX_GIT=", gm.kernel_tree, " # store into ~/.bashrc\n\n");
+		std::cout << "\n\nexport LINUX_GIT=" << gm.kernel_tree <<
+			     " # store into ~/.bashrc\n\n\n";
 	}
 	if (!gm.vulns.empty()) {
 		if (!SlGit::Repo::clone(gm.vulns, "https://git.kernel.org/pub/scm/linux/security/vulns.git"))
 			fail_with_message(git_error_last()->message);
-		emit_message("\n\nexport VULNS_GIT=", gm.vulns, " # store into ~/.bashrc\n\n");
+		std::cout << "\n\nexport VULNS_GIT=" << gm.vulns << " # store into ~/.bashrc\n\n\n";
 	}
 }
 
@@ -884,7 +885,8 @@ void validate_cves(const std::set<std::string> &s)
 							      std::regex::optimize);
 	for (const auto &str: s)
 		if (!std::regex_match(str, regex_cve_number))
-			emit_message(str, " does not seem to be a valid CVE number");
+			Clr(std::cerr, Clr::YELLOW) << str <<
+						       " does not seem to be a valid CVE number";
 }
 
 void handleCVEs(std::optional<SlCVEs::CVEHashMap> &cve_hash_map)
@@ -958,7 +960,7 @@ void handleSHAs(const Maintainers &maintainers,
 		if (gm.trace && !paths.empty()) {
 			std::cerr << "SHA " << sha << " contains the following paths: " << std::endl;
 			for (const auto &p: paths)
-				emit_message('\t', p);
+				std::cerr << '\t' << p << '\n';
 		}
 		std::ostringstream what;
 		if (gm.json) {
@@ -1032,7 +1034,8 @@ int main(int argc, char **argv)
 
 	const std::size_t libgit2_limit_opened_files = (get_soft_limit_for_opened_files(min_total_opened_files) - tracking_fixes_opened_files) / libgit2_opened_files_factor;
 	if (git_libgit2_opts(GIT_OPT_SET_MWINDOW_FILE_LIMIT, libgit2_limit_opened_files))
-	    emit_message("Could not set a limit for opened files: ", libgit2_limit_opened_files);
+		Clr(std::cerr, Clr::YELLOW) << "Could not set a limit for opened files: " <<
+					       libgit2_limit_opened_files;
 
 	if (gm.init) {
 		handleInit();
