@@ -11,12 +11,12 @@
 #include <utime.h>
 
 #include <sl/curl/Curl.h>
+#include <sl/cves/CVE2Bugzilla.h>
 #include <sl/cves/CVEHashMap.h>
 #include <sl/git/Repo.h>
 #include <sl/helpers/String.h>
 
 #include "helpers.h"
-#include "cve2bugzilla.h"
 
 namespace {
 
@@ -194,8 +194,8 @@ int main(int argc, char **argv)
 									  "https://gitlab.suse.de/security/cve-database/-/raw/master/data/cve2bugzilla",
 									  forceCVE2Bugzilla, false,
 									  std::chrono::hours{12});
-	CVE2Bugzilla cve_to_bugzilla;
-	if (!cve_to_bugzilla.load(cve2bugzilla_file))
+	const auto cve_to_bugzilla = SlCVEs::CVE2Bugzilla::create(cve2bugzilla_file);
+	if (!cve_to_bugzilla)
 		fail_with_message("Couldn't load cve2bugzilla.txt");
 
 	for (auto const &p: gm.paths) {
@@ -218,7 +218,7 @@ int main(int argc, char **argv)
 		const std::string cve = cve_hash_map->get_cve(sha);
 		if (cve.empty())
 			continue;
-		const std::string bsc = cve_to_bugzilla.get_bsc(cve);
+		const std::string bsc = cve_to_bugzilla->get_bsc(cve);
 
 		const long idx = get_references_idx(lines);
 		if (idx == -1) {

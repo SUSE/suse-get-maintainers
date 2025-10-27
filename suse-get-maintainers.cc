@@ -10,6 +10,7 @@
 #include <filesystem>
 
 #include <sl/curl/Curl.h>
+#include <sl/cves/CVE2Bugzilla.h>
 #include <sl/cves/CVEHashMap.h>
 #include <sl/git/Git.h>
 #include <sl/helpers/Color.h>
@@ -17,7 +18,6 @@
 
 #include "helpers.h"
 #include "git2.h"
-#include "cve2bugzilla.h"
 #include "Maintainers.h"
 #include "Person.h"
 
@@ -479,7 +479,7 @@ std::string maintainer_file_name_from_subsystem(const std::string &s)
 }
 
 bool fixes(const std::vector<Stanza> &stanzas, const std::string &grep, bool csv, bool trace,
-	   const SlCVEs::CVEHashMap &cve_hash_map, const CVE2Bugzilla &cve_to_bugzilla)
+	   const SlCVEs::CVEHashMap &cve_hash_map, const SlCVEs::CVE2Bugzilla &cve_to_bugzilla)
 {
 	const auto re = std::regex(grep, std::regex::icase | std::regex::optimize);
 	bool found = false;
@@ -711,10 +711,10 @@ void handleFixes(const Maintainers::MaintainersType &maintainers)
 									  cve2bugzilla_url,
 									  false, false,
 									  std::chrono::hours{12});
-	CVE2Bugzilla cve_to_bugzilla;
-	if (!cve_to_bugzilla.load(cve2bugzilla_file))
+	const auto cve_to_bugzilla = SlCVEs::CVE2Bugzilla::create(cve2bugzilla_file);
+	if (!cve_to_bugzilla)
 		fail_with_message("Couldn't load cve2bugzilla.txt");
-	if (!fixes(maintainers, gm.fixes, gm.csv, gm.trace, *cve_hash_map, cve_to_bugzilla))
+	if (!fixes(maintainers, gm.fixes, gm.csv, gm.trace, *cve_hash_map, *cve_to_bugzilla))
 		fail_with_message("unable to find a match for " + gm.fixes +
 				  " in maintainers or subsystems");
 }
