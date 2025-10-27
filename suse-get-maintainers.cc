@@ -17,7 +17,7 @@
 #include <sl/sqlite/SQLConn.h>
 
 #include "helpers.h"
-#include "git2.h"
+#include "GitHelpers.h"
 #include "Maintainers.h"
 #include "Person.h"
 
@@ -947,16 +947,16 @@ void handleSHAs(const Maintainers &maintainers,
 		gm.shas = read_stdin_sans_new_lines();
 	const bool simple = gm.shas.size() == 1 && !gm.from_stdin && !gm.csv && !gm.json;
 
-	validate_shas(gm.shas, cve_hash_map ? 40 : 12);
+	GitHelpers::validateShas(gm.shas, cve_hash_map ? 40 : 12);
 	bool first = true;
 
 	if (gm.json)
 		std::cout << "[\n";
 
-	search_commit(*rkOpt, gm.shas, maintainers.suse_users(), gm.only_maintainers, gm.trace,
-		      [&maintainers, &first, &cve_hash_map, &db, simple]
-		      (const std::string &sha, const std::vector<Person> &sb,
-		       const std::set<std::filesystem::path> &paths) {
+	GitHelpers::searchCommit(*rkOpt, gm.shas, maintainers.suse_users(), gm.only_maintainers,
+				 gm.trace, [&maintainers, &first, &cve_hash_map, &db, simple]
+				 (const std::string &sha, const std::vector<Person> &sb,
+				 const std::set<std::filesystem::path> &paths) {
 		if (gm.trace && !paths.empty()) {
 			std::cerr << "SHA " << sha << " contains the following paths: " << std::endl;
 			for (const auto &p: paths)

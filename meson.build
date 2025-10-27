@@ -27,11 +27,11 @@ prj_name = meson.project_name()
 executable(prj_name,
   [
     prj_name + '.cc',
+    'GitHelpers.cpp',
     'Maintainers.cpp',
     'Pattern.cpp',
     'Person.cpp',
   ],
-  implicit_include_directories: false,
   dependencies: [ cxxopts, libcves, libcurl, libgit2, sqlite3 ],
   install: true,
 )
