@@ -503,87 +503,90 @@ bool fixes(const std::vector<Stanza> &stanzas, const std::string &grep, bool csv
 			}
 	}
 	for (const auto &mf: files) {
-		const auto mf_on_the_disk = SlCurl::LibCurl::fetchFileIfNeeded(gm.cacheDir / mf, "http://fixes.prg2.suse.org/current/" + mf, false, true, std::chrono::hours{12});
+		const auto mf_on_the_disk = SlCurl::LibCurl::fetchFileIfNeeded(gm.cacheDir / mf,
+									       "http://fixes.prg2.suse.org/current/" + mf,
+									       false, true,
+									       std::chrono::hours{12});
 		if (csv)
 			std::cout << "commit,subsys-part,sle-versions,bsc,cve\n";
 		else
 			std::cout << "--------------------------------------------------------------------------------\n";
-		if (!mf_on_the_disk.empty()) {
-			if (trace)
-				std::cerr << mf_on_the_disk << '\n';
-			std::ifstream file{mf_on_the_disk};
-			if (!file.is_open())
-				fail_with_message("Unable to open file: ", mf_on_the_disk);
-			enum {
-				commit, subsys, sle_version, bsc, cve, last
-			};
-			std::string csv_details[last];
-			for (std::string line; getline(file, line);) {
-				std::string possible_cve;
+		if (mf_on_the_disk.empty()) {
+			std::cout << "No fixes for " << mf << ".\n";
+			continue;
+		}
 
-				auto line_not_hex_to_csv = [&csv_details, &line]() {
-					std::istringstream line_iss(line);
-					std::string considered, for_, version_;
-					line_iss >> considered >> for_ >> version_;
-					if(considered == "Considered" && for_ == "for") {
-						if (csv_details[sle_version] != "")
-							csv_details[sle_version] += ";";
-						csv_details[sle_version] += version_;
-					} else if (line.length() == 0 && csv_details[commit] != "") {
-						std::cout << csv_details[commit] << ","
-									<< csv_details[subsys] << ","
-									<< csv_details[sle_version] << ","
-									<< csv_details[bsc] << ","
-									<< csv_details[cve]
-									<< '\n';
-						std::fill_n(csv_details, last, "");
-					}
-				};
+		if (trace)
+			std::cerr << mf_on_the_disk << '\n';
 
-				auto line_is_hex_to_csv = [&csv_details, &possible_cve, &line, &cve_to_bugzilla]() {
-					const auto last_col = line.rfind(": ");
-					if (last_col != std::string::npos) {
-						csv_details[subsys] = line.substr(13, last_col - 13);
-						const std::string replace_chars = ",;()[]{}";
-						for (size_t loc; (loc = csv_details[subsys].find_first_of(replace_chars)) != std::string::npos;)
-							csv_details[subsys] = csv_details[subsys].replace(loc, 1, "");
-						for (size_t loc; (loc = csv_details[subsys].find(": ")) != std::string::npos;)
-							csv_details[subsys] = csv_details[subsys].replace(loc, 2, ";");
-					}
+		std::ifstream file{mf_on_the_disk};
+		if (!file.is_open())
+			fail_with_message("Unable to open file: ", mf_on_the_disk);
 
-					if (!possible_cve.empty()) {
-						csv_details[cve] = possible_cve;
+		enum {
+			commit, subsys, sle_version, bsc, cve, last
+		};
 
-						const std::string possible_bsc = cve_to_bugzilla.get_bsc(possible_cve);
-						if (!possible_bsc.empty())
-							csv_details[bsc] = possible_bsc.substr(4);
-					}
-				};
+		std::string csv_details[last];
+		for (std::string line; getline(file, line);) {
+			std::string possible_cve;
 
-				const auto possible_sha = (line.size() > 13 && line[12] == ' ') ? line.substr(0, 12) : "nope";
-				if (SlHelpers::String::isHex(possible_sha)) {
-					possible_cve = cve_hash_map.get_cve(possible_sha);
-					csv_details[commit] = possible_sha;
-				} else if (csv) {
-					line_not_hex_to_csv();
-					continue;
+			const auto possible_sha = (line.size() > 13 && line[12] == ' ') ?
+						line.substr(0, 12) : "nope";
+			if (SlHelpers::String::isHex(possible_sha)) {
+				possible_cve = cve_hash_map.get_cve(possible_sha);
+				csv_details[commit] = possible_sha;
+			} else if (csv) {
+				std::istringstream line_iss(line);
+				std::string considered, for_, version_;
+				line_iss >> considered >> for_ >> version_;
+				if(considered == "Considered" && for_ == "for") {
+					if (csv_details[sle_version] != "")
+						csv_details[sle_version] += ";";
+					csv_details[sle_version] += version_;
+				} else if (line.length() == 0 && csv_details[commit] != "") {
+					std::cout << csv_details[commit] << "," <<
+						     csv_details[subsys] << "," <<
+						     csv_details[sle_version] << "," <<
+						     csv_details[bsc] << "," <<
+						     csv_details[cve] <<
+						     '\n';
+					std::fill_n(csv_details, last, "");
 				}
-				if (csv) {
-					line_is_hex_to_csv();
-				} else {
-					std::cout << line << '\n';
-					if (!possible_cve.empty()) {
-						std::cout << "        " << possible_cve;
-						const std::string possible_bsc = cve_to_bugzilla.get_bsc(possible_cve);
-						if (!possible_bsc.empty())
-							std::cout << " https://bugzilla.suse.com/show_bug.cgi?id=" << possible_bsc.substr(4) << '\n';
-					}
+				continue;
+			}
+
+			if (csv) {
+				const auto last_col = line.rfind(": ");
+				if (last_col != std::string::npos) {
+					csv_details[subsys] = line.substr(13, last_col - 13);
+					const std::string replace_chars = ",;()[]{}";
+					for (size_t loc; (loc = csv_details[subsys].find_first_of(replace_chars)) != std::string::npos;)
+						csv_details[subsys] = csv_details[subsys].replace(loc, 1, "");
+					for (size_t loc; (loc = csv_details[subsys].find(": ")) != std::string::npos;)
+						csv_details[subsys] = csv_details[subsys].replace(loc, 2, ";");
+				}
+
+				if (!possible_cve.empty()) {
+					csv_details[cve] = possible_cve;
+
+					const std::string possible_bsc = cve_to_bugzilla.get_bsc(possible_cve);
+					if (!possible_bsc.empty())
+						csv_details[bsc] = possible_bsc.substr(4);
+				}
+			} else {
+				std::cout << line << '\n';
+				if (!possible_cve.empty()) {
+					std::cout << "        " << possible_cve;
+					const std::string possible_bsc = cve_to_bugzilla.get_bsc(possible_cve);
+					if (!possible_bsc.empty())
+						std::cout << " https://bugzilla.suse.com/show_bug.cgi?id=" <<
+							     possible_bsc.substr(4) << '\n';
 				}
 			}
-			if (csv)
-				std::cout << "\n";
-		} else
-			std::cout << "No fixes for " << mf << ".\n";
+		}
+		if (csv)
+			std::cout << "\n";
 	}
 	return found;
 }
