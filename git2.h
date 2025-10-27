@@ -1,6 +1,7 @@
 #ifndef SGM_GIT2_H
 #define SGM_GIT2_H
 
+#include <functional>
 #include <string>
 #include <set>
 #include <cstdio>
@@ -141,13 +142,14 @@ namespace {
 		}
 	}
 
-	template<typename F>
 	void search_commit(const SlGit::Repo &repo,
 			   const std::set<std::string> &shas,
 			   const std::set<std::string> &suse_users,
 			   bool skip_signoffs,
 			   bool trace,
-			   F pp)
+			   const std::function<void (const std::string &,
+						     const std::vector<SGM::Person> &,
+						     const std::set<std::filesystem::path> &)> &pp)
 	{
 		for (const std::string &s: shas) {
 			auto commit = repo.commitRevparseSingle(s);
