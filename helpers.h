@@ -23,13 +23,6 @@ namespace {
 		(std::cerr << ... << args) << std::endl;
 	}
 
-	struct NonCopyable
-	{
-		NonCopyable() = default;
-		NonCopyable(const NonCopyable&) = delete;
-		NonCopyable& operator=(const NonCopyable&) = delete;
-	};
-
 	bool is_suse_address([[maybe_unused]] const std::set<std::string> &users, const std::string &email)
 	{
 		return (email.ends_with("@suse.com") || email.ends_with("@suse.cz") || email.ends_with("@suse.de"));
