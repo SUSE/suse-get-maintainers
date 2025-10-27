@@ -32,8 +32,15 @@ public:
 		return m;
 	}
 
-	const std::vector<Stanza> &maintainers() const { return m_maintainers; }
-	const std::vector<Stanza> &upstream_maintainers() const { return m_upstream_maintainers; }
+	const Stanza *findBestMatch(const std::set<std::filesystem::path> &paths) const {
+		return findBestMatchInMaintainers(m_maintainers, paths);
+	}
+	const Stanza *findBestMatchUpstream(const std::set<std::filesystem::path> &paths) const {
+		return findBestMatchInMaintainers(m_upstream_maintainers, paths);
+	}
+
+	const MaintainersType &maintainers() const { return m_maintainers; }
+	const MaintainersType &upstream_maintainers() const { return m_upstream_maintainers; }
 	const std::set<std::string> &suse_users() const { return m_suse_users; }
 private:
 	Maintainers() {}
@@ -42,6 +49,9 @@ private:
 		      const Stanza::TranslateEmail &translateEmail);
 	bool loadUpstream(const std::filesystem::path &lsource, const std::string &origin,
 			  const Stanza::TranslateEmail &translateEmail);
+
+	static const Stanza *findBestMatchInMaintainers(const MaintainersType &sl,
+							const std::set<std::filesystem::path> &paths);
 
 	MaintainersType m_maintainers;
 	MaintainersType m_upstream_maintainers;

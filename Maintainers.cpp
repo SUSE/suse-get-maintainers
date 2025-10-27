@@ -116,3 +116,20 @@ bool Maintainers::loadUpstream(const std::filesystem::path &lsource, const std::
 	}
 	return true;
 }
+
+const Stanza *Maintainers::findBestMatchInMaintainers(const MaintainersType &sl,
+						      const std::set<std::filesystem::path> &paths)
+{
+	const Stanza *ret = nullptr;
+	unsigned best_weight = 0;
+	for(const auto &s: sl) {
+		unsigned weight = 0;
+		for (const auto &path: paths)
+			weight += s.match_path(path);
+		if (weight > best_weight) {
+			ret = &s;
+			best_weight = weight;
+		}
+	}
+	return ret;
+}

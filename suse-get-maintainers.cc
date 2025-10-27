@@ -599,23 +599,6 @@ std::set<T> read_stdin_sans_new_lines()
 	return ret;
 }
 
-std::optional<const Stanza *> find_best_match(const std::vector<Stanza> &sl,
-					      const std::set<std::filesystem::path> &paths)
-{
-	std::optional<const Stanza *> ret;
-	unsigned best_weight = 0;
-	for(const auto &s: sl) {
-		unsigned weight = 0;
-		for (const auto &path: paths)
-			weight += s.match_path(path);
-		if (weight > best_weight) {
-			ret.emplace(&s);
-			best_weight = weight;
-		}
-	}
-	return ret;
-}
-
 struct GetMaintainers
 {
 	std::string email;
@@ -629,21 +612,21 @@ void for_all_stanzas(const SQLConn &db,
 		     F pp,
 		     const std::string &what)
 {
-	std::optional<const Stanza *> stanza = find_best_match(maintainers.maintainers(), paths);
+	auto stanza = maintainers.findBestMatch(paths);
 
-	if (stanza.has_value()) {
+	if (stanza) {
 		if (gm.trace)
-			std::cerr << "STANZA: " << stanza.value()->name() << std::endl;
-		pp(*stanza.value(), what);
+			std::cerr << "STANZA: " << stanza->name() << std::endl;
+		pp(*stanza, what);
 		return;
 	}
 
-	stanza = find_best_match(maintainers.upstream_maintainers(), paths);
+	stanza = maintainers.findBestMatchUpstream(paths);
 
-	if (stanza.has_value()) {
+	if (stanza) {
 		if (gm.trace)
-			std::cerr << "Upstream STANZA: " << stanza.value()->name() << std::endl;
-		pp(*stanza.value(), what);
+			std::cerr << "Upstream STANZA: " << stanza->name() << std::endl;
+		pp(*stanza, what);
 		return;
 	}
 
