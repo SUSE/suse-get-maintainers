@@ -313,17 +313,15 @@ void parse_options(int argc, char **argv)
 
 void show_emails(const Stanza &m, const std::string &)
 {
-	m.for_all_maintainers([](const Person &p) {
+	for (const auto &p: m.maintainers())
 		std::cout << p.pretty(gm.names) << '\n';
-	});
 }
 
 void csv_output(const Stanza &m, const std::string &what)
 {
 	std::cout << what << ',' << '"' << m.name() << '"';
-	m.for_all_maintainers([](const Person &p) {
+	for (const auto &p: m.maintainers())
 		std::cout << ',' << p.pretty(gm.names);
-	});
 	std::cout << '\n';
 }
 
@@ -338,24 +336,24 @@ void json_output(const Stanza &m, const std::string &what)
 	std::cout << ": [\n      ";
 	bool first = true;
 	int backport_counts = 0;
-	m.for_all_maintainers([&first, &backport_counts](const Person &p) {
+	for (const auto &p: m.maintainers()) {
 		backport_counts += p.count();
 		if (!first)
 			std::cout << ",\n      ";
 		first = false;
 		Clr(Clr::GREEN) << Clr::NoNL << std::quoted(p.pretty(gm.names));
-	});
+	}
 	if (backport_counts > 0) {
 		std::cout << "\n    ],\n    ";
 		Clr(Clr::BLUE) << Clr::NoNL << "\"counts\"";
 		std::cout << ": [\n      ";
 		first = true;
-		m.for_all_maintainers([&first](const Person &p) {
+		for (const auto &p: m.maintainers()) {
 			if (!first)
 				std::cout << ",\n      ";
 			first = false;
 			Clr(Clr::GREEN) << Clr::NoNL << p.count();
-		});
+		}
 	}
 	std::cout << "\n    ]\n  }";
 }
@@ -437,12 +435,11 @@ bool whois(const Maintainers::MaintainersType &stanzas, const std::string &whois
 {
 	bool found = false;
 	for (const auto& s: stanzas) {
-		s.for_all_maintainers([&s, &whois, &found](const Person &p) {
+		for (const auto &p: s.maintainers())
 			if (p.email() == whois || p.email().starts_with(whois + "@")) {
 				std::cout << s.name() << "\n";
 				found = true;
 			}
-		});
 	}
 	return found;
 }
@@ -452,7 +449,7 @@ bool grep(const Maintainers::MaintainersType &stanzas, const std::string &grep, 
 	const auto re = std::regex(grep, std::regex::icase | std::regex::optimize);
 	bool found = false;
 	for (const auto& s: stanzas) {
-		s.for_all_maintainers([&re, &s, &grep, &found, names](const Person &p) {
+		for (const auto &p: s.maintainers())
 			try {
 				if (std::regex_search(p.email(), re) ||
 						std::regex_search(p.name(), re) ||
@@ -467,7 +464,6 @@ bool grep(const Maintainers::MaintainersType &stanzas, const std::string &grep, 
 			} catch (const std::regex_error& e) {
 				fail_with_message(grep + ": " + e.what());
 			}
-		});
 	}
 	return found;
 }
@@ -494,7 +490,7 @@ bool fixes(const std::vector<Stanza> &stanzas, const std::string &grep, bool csv
 	bool found = false;
 	std::set<std::string> files;
 	for (const auto& s: stanzas) {
-		s.for_all_maintainers([&re, &s, &grep, &found, &files](const Person &p) {
+		for (const auto &p: s.maintainers())
 			try {
 				if (std::regex_search(p.email(), re) ||
 						std::regex_search(p.name(), re) ||
@@ -505,7 +501,6 @@ bool fixes(const std::vector<Stanza> &stanzas, const std::string &grep, bool csv
 			} catch (const std::regex_error& e) {
 				fail_with_message(grep + ": " + e.what());
 			}
-		});
 	}
 	for (const auto &mf: files) {
 		const auto mf_on_the_disk = SlCurl::LibCurl::fetchFileIfNeeded(gm.cacheDir / mf, "http://fixes.prg2.suse.org/current/" + mf, false, true, std::chrono::hours{12});

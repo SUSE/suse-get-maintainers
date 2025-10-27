@@ -16,6 +16,7 @@ namespace SGM {
 class Stanza {
 public:
 	using TranslateEmail = std::function<std::string (const std::string_view &sv)>;
+	using Maintainers = std::vector<Person>;
 
 	Stanza() = default;
 	Stanza(const std::string &name) : m_name(name) {}
@@ -83,11 +84,7 @@ public:
 		return m_name.empty() || m_maintainers.empty() || m_patterns.empty();
 	}
 
-	template<typename F>
-	void for_all_maintainers(F callback) const {
-		for (const auto &p: m_maintainers)
-			callback(p);
-	}
+	const Maintainers &maintainers() const { return m_maintainers; }
 
 	void new_entry(const std::string_view &n) {
 		m_name = n;
@@ -98,7 +95,7 @@ public:
 	const std::string name() const { return m_name; }
 private:
 	std::string m_name;
-	std::vector<Person> m_maintainers;
+	Maintainers m_maintainers;
 	std::vector<Pattern> m_patterns;
 };
 
