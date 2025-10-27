@@ -15,6 +15,7 @@
 #include <sl/git/Git.h>
 #include <sl/helpers/Color.h>
 #include <sl/helpers/Misc.h>
+#include <sl/helpers/SUSE.h>
 #include <sl/sqlite/SQLConn.h>
 
 #include "helpers.h"
@@ -775,8 +776,7 @@ void handlePaths(const Maintainers &maintainers, const SQLConn &db)
 }
 
 std::variant<std::set<std::filesystem::path>, std::vector<Person>>
-get_paths_from_patch(const std::filesystem::path &path, const std::set<std::string> &users,
-		     bool skip_signoffs)
+get_paths_from_patch(const std::filesystem::path &path, bool skip_signoffs)
 {
 	std::variant<std::set<std::filesystem::path>, std::vector<Person>> ret;
 	const auto path_to_patch = std::filesystem::absolute(path);
@@ -797,11 +797,11 @@ get_paths_from_patch(const std::filesystem::path &path, const std::set<std::stri
 		if (!skip_signoffs && signoffs) {
 			if (line.starts_with("From") || line.starts_with("Author")) {
 				if (const auto p = Person::parsePerson(line, Role::Author))
-					if (is_suse_address(users, p->email()))
+					if (SlHelpers::SUSE::isSUSEAddress(p->email()))
 						people.push_back(std::move(*p));
 			}
 			if (const auto p = Person::parse(line))
-				if (is_suse_address(users, p->email()))
+				if (SlHelpers::SUSE::isSUSEAddress(p->email()))
 					people.push_back(std::move(*p));
 			if (line.starts_with("---"))
 			    signoffs = false;
@@ -830,8 +830,7 @@ void handleDiffs(const Maintainers &maintainers, const SQLConn &db)
 		bool first = true;
 		for (const auto &ps: gm.diffs) {
 			try {
-				auto s = get_paths_from_patch(ps, maintainers.suse_users(),
-							      gm.only_maintainers);
+				auto s = get_paths_from_patch(ps, gm.only_maintainers);
 				if (gm.trace && std::holds_alternative<std::set<std::filesystem::path>>(s)) {
 
 					std::cerr << "patch " << ps << " contains the following paths: " << std::endl;
@@ -864,8 +863,7 @@ void handleDiffs(const Maintainers &maintainers, const SQLConn &db)
 		return;
 	}
 
-	auto s = get_paths_from_patch(*gm.diffs.cbegin(), maintainers.suse_users(),
-				      gm.only_maintainers);
+	auto s = get_paths_from_patch(*gm.diffs.cbegin(), gm.only_maintainers);
 	if (gm.trace && std::holds_alternative<std::set<std::filesystem::path>>(s)) {
 		std::cerr << "patch " << *gm.diffs.cbegin() << " contains the following paths: " <<
 			     std::endl;
@@ -954,8 +952,8 @@ void handleSHAs(const Maintainers &maintainers,
 	if (gm.json)
 		std::cout << "[\n";
 
-	GitHelpers::searchCommit(*rkOpt, gm.shas, maintainers.suse_users(), gm.only_maintainers,
-				 gm.trace, [&maintainers, &first, &cve_hash_map, &db, simple]
+	GitHelpers::searchCommit(*rkOpt, gm.shas, gm.only_maintainers, gm.trace,
+				 [&maintainers, &first, &cve_hash_map, &db, simple]
 				 (const std::string &sha, const std::vector<Person> &sb,
 				 const std::set<std::filesystem::path> &paths) {
 		if (gm.trace && !paths.empty()) {

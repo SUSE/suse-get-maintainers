@@ -29,13 +29,11 @@ public:
 
 	static void searchCommit(const SlGit::Repo &repo,
 				 const std::set<std::string> &shas,
-				 const std::set<std::string> &suse_users,
 				 bool skip_signoffs, bool trace,
 				 const SearchCallback &pp);
 
 private:
-	static std::vector<Person> getSomebodyElse(const SlGit::Commit &commit,
-						   const std::set<std::string> &users);
+	static std::vector<Person> getSomebodyElse(const SlGit::Commit &commit);
 	static void simpleTreeEntryAdd(const SlGit::TreeEntry &e, const SlGit::Repo &repo,
 				       std::set<std::filesystem::path> &paths,
 				       const std::string &prefix,

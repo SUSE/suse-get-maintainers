@@ -1,7 +1,6 @@
 #include <sl/git/Commit.h>
 #include <sl/helpers/Color.h>
-
-#include "helpers.h"
+#include <sl/helpers/SUSE.h>
 
 #include "GitHelpers.h"
 
@@ -9,7 +8,6 @@ using namespace SGM;
 using Clr = SlHelpers::Color;
 
 void GitHelpers::searchCommit(const SlGit::Repo &repo, const std::set<std::string> &shas,
-			      const std::set<std::string> &suse_users,
 			      bool skip_signoffs, bool trace,
 			      const SearchCallback &pp)
 {
@@ -21,7 +19,7 @@ void GitHelpers::searchCommit(const SlGit::Repo &repo, const std::set<std::strin
 		std::set<std::filesystem::path> paths;
 		std::vector<SGM::Person> sb;
 		if (!skip_signoffs) {
-			sb = getSomebodyElse(*commit, suse_users);
+			sb = getSomebodyElse(*commit);
 			if (!sb.empty()) {
 				if (trace)
 					std::cerr << "SHA " << s <<
@@ -44,19 +42,18 @@ void GitHelpers::searchCommit(const SlGit::Repo &repo, const std::set<std::strin
 	}
 }
 
-std::vector<Person> GitHelpers::getSomebodyElse(const SlGit::Commit &commit,
-						const std::set<std::string> &users)
+std::vector<Person> GitHelpers::getSomebodyElse(const SlGit::Commit &commit)
 {
 	std::vector<Person> ret;
 	const auto author = commit.author();
-	if (is_suse_address(users, author->email))
+	if (SlHelpers::SUSE::isSUSEAddress(author->email))
 		ret.push_back(Person(Role::Author, author->name, author->email));
 
 	const std::string message = commit.message();
 	std::istringstream stream(message);
 	for (std::string line; std::getline(stream, line);) {
 		if (auto p = Person::parse(line))
-			if (is_suse_address(users, p->email()))
+			if (SlHelpers::SUSE::isSUSEAddress(p->email()))
 				ret.push_back(std::move(*p));
 	}
 	return ret;
