@@ -15,6 +15,7 @@
 #include <sl/cves/CVEHashMap.h>
 #include <sl/git/Repo.h>
 #include <sl/helpers/Color.h>
+#include <sl/helpers/Misc.h>
 #include <sl/helpers/String.h>
 
 #include "helpers.h"
@@ -32,10 +33,10 @@ struct gm {
 
 std::vector<std::filesystem::path> read_all_patches()
 {
-	std::filesystem::path ksource_git;
-	try_to_fetch_env(ksource_git, "KSOURCE_GIT");
-	if (ksource_git.empty())
+	auto ksourceGitOpt = SlHelpers::Env::get<std::filesystem::path>("KSOURCE_GIT");
+	if (!ksourceGitOpt)
 		fail_with_message("Please set KSOURCE_GIT!");
+	auto ksource_git = std::move(ksourceGitOpt.value());
 	ksource_git /= "patches.suse";
 	if (!std::filesystem::exists(ksource_git))
 		fail_with_message(ksource_git, " does not exists!");

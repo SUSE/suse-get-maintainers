@@ -14,6 +14,7 @@
 #include <sl/cves/CVEHashMap.h>
 #include <sl/git/Git.h>
 #include <sl/helpers/Color.h>
+#include <sl/helpers/Misc.h>
 #include <sl/sqlite/SQLConn.h>
 
 #include "helpers.h"
@@ -1042,8 +1043,12 @@ int main(int argc, char **argv)
 		return 0;
 	}
 
-	try_to_fetch_env(gm.vulns, "VULNS_GIT");
-	try_to_fetch_env(gm.kernel_tree, "LINUX_GIT");
+	if (gm.vulns.empty())
+		if (const auto path = SlHelpers::Env::get<std::filesystem::path>("VULNS_GIT"))
+			gm.vulns = *path;
+	if (gm.kernel_tree.empty())
+		if (const auto path = SlHelpers::Env::get<std::filesystem::path>("LINUX_GIT"))
+			gm.kernel_tree = *path;
 
 	const auto m = Maintainers::load(gm.maintainers, gm.kernel_tree, gm.origin, translateEmail);
 	if (!m)

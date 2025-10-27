@@ -23,16 +23,6 @@ namespace {
 		return (email.ends_with("@suse.com") || email.ends_with("@suse.cz") || email.ends_with("@suse.de"));
 		//&& users.contains(email.substr(0, email.find_first_of("@")));
 	}
-
-	template <typename T>
-	void try_to_fetch_env(T &var, const std::string &name)
-	{
-		if (var.empty()) {
-			const char *ptr = std::getenv(name.c_str());
-			if (ptr)
-				var = ptr;
-		}
-	}
 }
 
 #endif
