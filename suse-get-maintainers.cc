@@ -701,9 +701,10 @@ void handleInit()
 
 void handleFixes(const Maintainers::MaintainersType &maintainers)
 {
-	SlCVEs::CVEHashMap cve_hash_map{SlCVEs::CVEHashMap::ShaSize::Short, gm.cve_branch, gm.year,
-				gm.rejected};
-	if (!cve_hash_map.load(gm.vulns))
+	const auto cve_hash_map = SlCVEs::CVEHashMap::create(gm.vulns,
+							     SlCVEs::CVEHashMap::ShaSize::Short,
+							     gm.cve_branch, gm.year, gm.rejected);
+	if (!cve_hash_map)
 		fail_with_message("Unable to load kernel vulns database git tree: ", gm.vulns);
 	constexpr const char cve2bugzilla_url[] = "https://gitlab.suse.de/security/cve-database/-/raw/master/data/cve2bugzilla";
 	const auto cve2bugzilla_file = SlCurl::LibCurl::fetchFileIfNeeded(gm.cacheDir / "cve2bugzilla.txt",
@@ -713,7 +714,7 @@ void handleFixes(const Maintainers::MaintainersType &maintainers)
 	CVE2Bugzilla cve_to_bugzilla;
 	if (!cve_to_bugzilla.load(cve2bugzilla_file))
 		fail_with_message("Couldn't load cve2bugzilla.txt");
-	if (!fixes(maintainers, gm.fixes, gm.csv, gm.trace, cve_hash_map, cve_to_bugzilla))
+	if (!fixes(maintainers, gm.fixes, gm.csv, gm.trace, *cve_hash_map, cve_to_bugzilla))
 		fail_with_message("unable to find a match for " + gm.fixes +
 				  " in maintainers or subsystems");
 }
@@ -886,16 +887,18 @@ void validate_cves(const std::set<std::string> &s)
 			emit_message(str, " does not seem to be a valid CVE number");
 }
 
-void handleCVEs(SlCVEs::CVEHashMap &cve_hash_map)
+void handleCVEs(std::optional<SlCVEs::CVEHashMap> &cve_hash_map)
 {
 	if (gm.vulns.empty())
 		fail_with_message("Provide a path to kernel vulns database git tree either via -v or $VULNS_GIT");
 
-	if (!cve_hash_map.load(gm.vulns))
+	cve_hash_map = SlCVEs::CVEHashMap::create(gm.vulns, SlCVEs::CVEHashMap::ShaSize::Long,
+						  gm.cve_branch, gm.year, gm.rejected);
+	if (!cve_hash_map)
 		fail_with_message("Unable to load kernel vulns database git tree: ", gm.vulns);
 
 	if (gm.all_cves) {
-		gm.cves = cve_hash_map.get_all_cves();
+		gm.cves = cve_hash_map->get_all_cves();
 		gm.from_stdin = false;
 	}
 
@@ -905,7 +908,7 @@ void handleCVEs(SlCVEs::CVEHashMap &cve_hash_map)
 	if (gm.cves.size() > 1) {
 		validate_cves(gm.cves);
 		for (const auto &c: gm.cves) {
-			const std::vector<std::string> shas = cve_hash_map.get_shas(c);
+			const std::vector<std::string> shas = cve_hash_map->get_shas(c);
 			for (const std::string &s: shas) {
 				gm.shas.insert(s);
 				if (gm.trace)
@@ -915,7 +918,7 @@ void handleCVEs(SlCVEs::CVEHashMap &cve_hash_map)
 				std::cerr << "Unable to translate CVE number (" << c << ") to SHA hash" << std::endl;
 		}
 	} else {
-		const std::vector<std::string> shas = cve_hash_map.get_shas(*gm.cves.cbegin());
+		const std::vector<std::string> shas = cve_hash_map->get_shas(*gm.cves.cbegin());
 		for (const std::string &s: shas) {
 			gm.shas.insert(s);
 			if (gm.trace)
@@ -927,9 +930,8 @@ void handleCVEs(SlCVEs::CVEHashMap &cve_hash_map)
 }
 
 void handleSHAs(const Maintainers &maintainers,
-		const SlCVEs::CVEHashMap &cve_hash_map,
-		const SQLConn &db,
-		bool has_cves)
+		const std::optional<SlCVEs::CVEHashMap> &cve_hash_map,
+		const SQLConn &db)
 {
 	if (gm.kernel_tree.empty())
 		fail_with_message("Provide a path to mainline git kernel tree either via -k or $LINUX_GIT");
@@ -939,18 +941,18 @@ void handleSHAs(const Maintainers &maintainers,
 		fail_with_message("Unable load kernel tree: ", gm.kernel_tree, " (",
 				  git_error_last()->message, ")");
 
-	if (gm.shas.size() == 1 && gm.from_stdin && !has_cves)
+	if (gm.shas.size() == 1 && gm.from_stdin && !cve_hash_map)
 		gm.shas = read_stdin_sans_new_lines();
 	const bool simple = gm.shas.size() == 1 && !gm.from_stdin && !gm.csv && !gm.json;
 
-	validate_shas(gm.shas, has_cves ? 40 : 12);
+	validate_shas(gm.shas, cve_hash_map ? 40 : 12);
 	bool first = true;
 
 	if (gm.json)
 		std::cout << "[\n";
 
 	search_commit(*rkOpt, gm.shas, maintainers.suse_users(), gm.only_maintainers, gm.trace,
-		      [&maintainers, &has_cves, &first, &cve_hash_map, &db, simple]
+		      [&maintainers, &first, &cve_hash_map, &db, simple]
 		      (const std::string &sha, const std::vector<Person> &sb,
 		       const std::set<std::filesystem::path> &paths) {
 		if (gm.trace && !paths.empty()) {
@@ -964,20 +966,20 @@ void handleSHAs(const Maintainers &maintainers,
 				what << ",\n";
 			first = false;
 			what << "  {\n";
-			if (has_cves) {
+			if (cve_hash_map) {
 				what << "    ";
 				Clr(what, Clr::BLUE) << Clr::NoNL << "\"cve\"";
 				what << ": ";
 				Clr(what, Clr::GREEN) << Clr::NoNL << '"' <<
-							 cve_hash_map.get_cve(sha) << '"';
+							 cve_hash_map->get_cve(sha) << '"';
 				what << ",\n";
 			}
 			what << "    ";
 			Clr(what, Clr::BLUE) << Clr::NoNL << "\"sha\"";
 			what << ": ";
 			Clr(what, Clr::GREEN) << Clr::NoNL << '"' << sha << '"';
-		} else if (has_cves)
-			what << cve_hash_map.get_cve(sha) << ',' << sha;
+		} else if (cve_hash_map)
+			what << cve_hash_map->get_cve(sha) << ',' << sha;
 		else
 			what << sha;
 		if (!sb.empty()) {
@@ -1077,17 +1079,13 @@ int main(int argc, char **argv)
 		return 0;
 	}
 
-	SlCVEs::CVEHashMap cve_hash_map{SlCVEs::CVEHashMap::ShaSize::Long, gm.cve_branch, gm.year,
-				gm.rejected};
-	bool has_cves = false;
+	std::optional<SlCVEs::CVEHashMap> cve_hash_map;
 
-	if (!gm.cves.empty() || gm.all_cves) {
+	if (!gm.cves.empty() || gm.all_cves)
 		handleCVEs(cve_hash_map);
-		has_cves = true;
-	}
 
 	if (!gm.shas.empty()) {
-		handleSHAs(*m, cve_hash_map, db, has_cves);
+		handleSHAs(*m, cve_hash_map, db);
 		return 0;
 	}
 

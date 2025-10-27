@@ -184,8 +184,10 @@ int main(int argc, char **argv)
 		}
 	}
 
-	SlCVEs::CVEHashMap cve_hash_map{SlCVEs::CVEHashMap::ShaSize::Long, gm.cve_branch, 0, false};
-	if (!cve_hash_map.load(gm.vulns))
+	const auto cve_hash_map = SlCVEs::CVEHashMap::create(gm.vulns,
+							     SlCVEs::CVEHashMap::ShaSize::Long,
+							     gm.cve_branch, 0, false);
+	if (!cve_hash_map)
 		fail_with_message("Couldn't load kernel vulns database git tree");
 
 	const auto cve2bugzilla_file = SlCurl::LibCurl::fetchFileIfNeeded("cve2bugzilla.txt",
@@ -213,7 +215,7 @@ int main(int argc, char **argv)
 			continue;
 		}
 
-		const std::string cve = cve_hash_map.get_cve(sha);
+		const std::string cve = cve_hash_map->get_cve(sha);
 		if (cve.empty())
 			continue;
 		const std::string bsc = cve_to_bugzilla.get_bsc(cve);
