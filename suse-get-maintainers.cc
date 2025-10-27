@@ -9,6 +9,8 @@
 #include <unistd.h>
 #include <filesystem>
 
+#include <sys/resource.h>
+
 #include <sl/curl/Curl.h>
 #include <sl/cves/CVE2Bugzilla.h>
 #include <sl/cves/CVEHashMap.h>
@@ -18,7 +20,6 @@
 #include <sl/helpers/SUSE.h>
 #include <sl/sqlite/SQLConn.h>
 
-#include "helpers.h"
 #include "GitHelpers.h"
 #include "Maintainers.h"
 #include "Person.h"
@@ -27,6 +28,12 @@ using namespace SGM;
 using Clr = SlHelpers::Color;
 
 namespace {
+
+template<typename... Args> void fail_with_message(Args&&... args)
+{
+	(std::cerr << ... << args) << std::endl;
+	throw 1;
+}
 
 class SQLConn : public SlSqlite::SQLConn {
 public:
@@ -994,12 +1001,8 @@ void handleSHAs(const Maintainers &maintainers,
 		std::cout << "\n]\n";
 }
 
-} // namespace
-
-int main(int argc, char **argv)
+int handled_main(int argc, char **argv)
 {
-	SGM_BEGIN;
-
 	std::cin.tie(nullptr);
 	std::ios::sync_with_stdio(false);
 
@@ -1095,5 +1098,18 @@ int main(int argc, char **argv)
 		return 0;
 	}
 
-	SGM_END;
+	return 0;
+}
+
+} // namespace
+
+int main(int argc, char **argv)
+{
+	try {
+		return handled_main(argc, argv);
+	} catch (int ret) {
+		return ret;
+	} catch (...) {
+		return 42;
+	}
 }

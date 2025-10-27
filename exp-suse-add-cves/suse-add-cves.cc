@@ -18,11 +18,15 @@
 #include <sl/helpers/Misc.h>
 #include <sl/helpers/String.h>
 
-#include "helpers.h"
-
 using Clr = SlHelpers::Color;
 
 namespace {
+
+template<typename... Args> void fail_with_message(Args&&... args)
+{
+	(std::cerr << ... << args) << std::endl;
+	throw 1;
+}
 
 struct gm {
 	std::filesystem::path vulns;
@@ -145,12 +149,8 @@ bool already_has_bsc_ref(const std::string &ref_line, const std::string &bsc_num
 	return ref_line.find(bsc_number) != std::string::npos;
 }
 
-} // namespace
-
-int main(int argc, char **argv)
+int handled_main(int argc, char **argv)
 {
-	SGM_BEGIN;
-
 	parse_options(argc, argv);
 
 	if (gm.init) {
@@ -254,6 +254,18 @@ int main(int argc, char **argv)
 		std::filesystem::rename(new_patch, path_to_patch);
 	}
 
-	SGM_END;
+	return 0;
 }
 
+} // namespace
+
+int main(int argc, char **argv)
+{
+	try {
+		return handled_main(argc, argv);
+	} catch (int ret) {
+		return ret;
+	} catch (...) {
+		return 42;
+	}
+}
