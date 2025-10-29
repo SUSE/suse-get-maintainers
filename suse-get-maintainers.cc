@@ -37,8 +37,8 @@ template<typename... Args> void fail_with_message(Args&&... args)
 
 class SQLConn : public SlSqlite::SQLConn {
 public:
-	virtual int prepDB() {
-		if (prepareStatement("SELECT user.email, sum(map.count) AS cnt "
+	virtual bool prepDB() override {
+		if (!prepareStatement("SELECT user.email, sum(map.count) AS cnt "
 				     "FROM user_file_map AS map "
 				     "LEFT JOIN user ON map.user = user.id "
 				     "WHERE map.file = (SELECT id FROM file WHERE file = :file "
@@ -46,24 +46,19 @@ public:
 				     "GROUP BY substr(user.email, 0, instr(user.email, '@')) "
 				     "ORDER BY cnt DESC, user.email "
 				     "LIMIT :limit;", selGetMaintainers))
-			return -1;
+			return false;
 
-		return 0;
+		return true;
 	}
 
 	std::optional<SlSqlite::SQLConn::SelectResult>
 	get_maintainers(const std::string &file, const std::string &dir, int limit) const
 	{
-		SlSqlite::SQLConn::SelectResult res;
-
-		if (select(selGetMaintainers, {
+		return select(selGetMaintainers, {
 				{ ":file", file },
 				{ ":dir", dir },
 				{ ":limit", limit },
-				}, { typeid(std::string), typeid(int) }, res))
-			return {};
-
-		return res;
+				}, { typeid(std::string), typeid(int) });
 	}
 
 	explicit operator bool() const { return sqlHolder.operator bool(); }
@@ -1056,8 +1051,9 @@ int handled_main(int argc, char **argv)
 
 	SQLConn db;
 	if (!gm.no_db)
-		if (db.open(gm.conf_file_map))
-			fail_with_message("Failed to open db: ", gm.conf_file_map);
+		if (!db.open(gm.conf_file_map))
+			fail_with_message("Failed to open db: ", gm.conf_file_map, ": ",
+					  db.lastError());
 
 	if (!gm.paths.empty()) {
 		handlePaths(*m, db);
