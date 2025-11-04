@@ -1,11 +1,14 @@
 #include <cassert>
 
 #include "../Pattern.h"
+#include "../Person.h"
 #include "../Stanza.h"
 
 using namespace SGM;
 
-static void test_pattern()
+namespace {
+
+void test_pattern()
 {
 	{
 		auto p = Pattern::create("drivers/char/tpm/");
@@ -50,7 +53,48 @@ static void test_pattern()
 	}
 }
 
-static void test_stanza()
+void test_person()
+{
+	static const std::string email("email@somewhere.com");
+	static const std::string email2("email2@somewhere.com");
+	static const std::string name("Some Maintainer");
+	static const std::string name2("Some Longer Longer Maintainer");
+	{
+		const auto p = Person::parsePerson("M: " + email, Role::Maintainer);
+		assert(p);
+		assert(p->name().empty());
+		assert(p->email() == email);
+		assert(p->role().role() == Role::Maintainer);
+		assert(p->role().toString() == "Maintainer");
+	}
+	{
+		const auto p = Person::parsePerson("M: " + name + " <" + email + '>',
+						   Role::Author);
+		assert(p);
+		assert(p->name() == name);
+		assert(p->email() == email);
+		assert(p->role().role() == Role::Author);
+		assert(p->role().toString() == "Author");
+	}
+	{
+		auto p = Person::parsePerson("M: " + name2 + " <" + email + '>',
+						   Role::Author);
+		assert(p);
+		assert(p->name() == name2);
+		assert(p->email() == email);
+		p->setEmail(email2);
+		assert(p->email() == email2);
+		assert(p->pretty() == name2 + " <" + email2 + '>');
+		assert(p->pretty([](const auto &e) { return "foo-" + e; }) ==
+		       name2 + " <foo-" + email2 + '>');
+	}
+	assert(!Person::parsePerson("M " + name + " <" + email + '>', Role::Maintainer));
+	assert(!Person::parsePerson("M: " + name + " <foo>", Role::Maintainer));
+	assert(!Person::parsePerson("M: " + name + " >" + email + '>', Role::Maintainer));
+	assert(!Person::parsePerson("M: " + name + " <" + email, Role::Maintainer));
+}
+
+void test_stanza()
 {
 	Stanza s;
 
@@ -63,10 +107,13 @@ static void test_stanza()
 	assert(s.match_path("drivers/ccc/ttt/a.c") == 1);
 }
 
+} //namespace
+
 int main()
 {
 	git_libgit2_init();
 	test_pattern();
+	test_person();
 	test_stanza();
 	git_libgit2_shutdown();
 
