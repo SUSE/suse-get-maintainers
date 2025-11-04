@@ -16,15 +16,13 @@ void GitHelpers::searchCommit(const SlGit::Repo &repo, const std::set<std::strin
 		if (!commit || commit->parentCount() != 1)
 			continue;
 
-		std::set<std::filesystem::path> paths;
-		std::vector<SGM::Person> sb;
 		if (!skip_signoffs) {
-			sb = getSomebodyElse(*commit);
+			const auto sb = getSomebodyElse(*commit);
 			if (!sb.empty()) {
 				if (trace)
 					std::cerr << "SHA " << s <<
 						     " contains directly our people: skipping maintainers file (suppress this with -M)!\n";
-				pp(s, sb, paths);
+				pp(s, sb, {});
 				continue;
 			}
 		}
@@ -36,9 +34,11 @@ void GitHelpers::searchCommit(const SlGit::Repo &repo, const std::set<std::strin
 			continue;
 		}
 
+		std::set<std::filesystem::path> paths;
+
 		simpleTreeDiff(repo, *parent->tree(), *commit->tree(), paths);
 
-		pp(s, sb, paths);
+		pp(s, {}, paths);
 	}
 }
 
