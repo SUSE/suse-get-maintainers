@@ -23,15 +23,19 @@ libcves = dependency('slcves++')
 libgit2 = dependency('slgit++')
 sqlite3 = dependency('slsqlite++')
 
+sgm_lib = static_library('sgm_library', [
+    'Pattern.cpp',
+    'Person.cpp',
+])
+
 prj_name = meson.project_name()
 executable(prj_name,
   [
     prj_name + '.cc',
     'GitHelpers.cpp',
     'Maintainers.cpp',
-    'Pattern.cpp',
-    'Person.cpp',
   ],
+  link_with: sgm_lib,
   dependencies: [ cxxopts, libcves, libcurl, libgit2, sqlite3 ],
   install: true,
 )
