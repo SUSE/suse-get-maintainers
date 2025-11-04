@@ -734,7 +734,7 @@ void handlePaths(const Maintainers &maintainers, const SQLConn &db)
 				what << "  {\n    ";
 				Clr(what, Clr::BLUE) << Clr::NoNL << "\"path\"";
 				what << ": ";
-				Clr(what, Clr::GREEN) << Clr::NoNL << '"' << p << '"';
+				Clr(what, Clr::GREEN) << Clr::NoNL << p;
 			} else
 				what << p;
 			for_all_stanzas(db, maintainers, {p},
