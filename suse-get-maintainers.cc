@@ -597,12 +597,6 @@ std::set<T> read_stdin_sans_new_lines()
 	return ret;
 }
 
-struct GetMaintainers
-{
-	std::string email;
-	int count;
-};
-
 template<typename F>
 void for_all_stanzas(const SQLConn &db,
 		     const Maintainers &maintainers,
@@ -641,21 +635,16 @@ void for_all_stanzas(const SQLConn &db,
 			}
 		}
 		if (!emails_and_counts_m.empty()) {
-			struct GetMaintainers
-			{
-				std::string email;
-				unsigned count;
-			};
-
-			std::vector<GetMaintainers> emails_and_counts_v;
+			std::vector<std::pair<std::string, unsigned>> emails_and_counts_v;
 			for (const auto &e: emails_and_counts_m)
-				emails_and_counts_v.push_back(GetMaintainers(std::move(e.first), e.second));
-			std::sort(emails_and_counts_v.begin(), emails_and_counts_v.end(), [](const GetMaintainers &a, const GetMaintainers &b) {
-				return a.count > b.count;
+				emails_and_counts_v.push_back({ std::move(e.first), e.second });
+			std::sort(emails_and_counts_v.begin(), emails_and_counts_v.end(),
+				  [](const auto &a, const auto &b) {
+				return a.second > b.second;
 			});
 			Stanza s("Backporter");
 			for (const auto &e: emails_and_counts_v)
-				s.add_backporter("M: Backporter <" + e.email + ">", e.count,
+				s.add_backporter("M: Backporter <" + e.first + ">", e.second,
 						 translateEmail);
 			if (gm.trace)
 				std::cerr << "Backporters:" << std::endl;
