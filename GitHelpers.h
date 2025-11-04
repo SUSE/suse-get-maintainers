@@ -34,19 +34,6 @@ public:
 
 private:
 	static std::vector<Person> getSomebodyElse(const SlGit::Commit &commit);
-	static void simpleTreeEntryAdd(const SlGit::TreeEntry &e, const SlGit::Repo &repo,
-				       std::set<std::filesystem::path> &paths,
-				       const std::string &prefix,
-				       const std::string &name);
-
-	static void simpleTreeEntryDiff(const std::string &name, const SlGit::Repo &repo,
-					const SlGit::TreeEntry &a, const SlGit::TreeEntry &b,
-					std::set<std::filesystem::path> &paths,
-					const std::string &prefix);
-
-	static void simpleTreeDiff(const SlGit::Repo &repo, const SlGit::Tree &pt,
-				   const SlGit::Tree &ct, std::set<std::filesystem::path> &paths,
-				   const std::string &prefix = std::string());
 };
 
 }
