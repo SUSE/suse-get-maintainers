@@ -652,7 +652,8 @@ void for_all_stanzas(const SQLConn &db,
 		}
 	}
 
-	thread_local auto catch_all_maintainer = Stanza{"Base", "F: Kernel Developers at SuSE <kernel@suse.de>"};
+	thread_local Stanza catch_all_maintainer{"Base", "Kernel Developers at SUSE",
+						 "kernel@suse.de"};
 	if (gm.trace)
 		std::cerr << "STANZA: " << catch_all_maintainer.name() << std::endl;
 	pp(catch_all_maintainer, what);

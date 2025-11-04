@@ -20,10 +20,8 @@ public:
 
 	Stanza() = default;
 	Stanza(const std::string &name) : m_name(name) {}
-	Stanza(const std::string &n, const std::string &who) : m_name(n) {
-		if (auto m = Person::parsePerson(who, Role::Maintainer))
-			m_maintainers.push_back(std::move(*m));
-	}
+	Stanza(const std::string &n, const std::string &name, const std::string &email)
+		: m_name(n), m_maintainers{Person(Role::Maintainer, name, email)} { }
 
 	unsigned match_path(const std::filesystem::path &path) const {
 		return std::accumulate(m_patterns.cbegin(), m_patterns.cend(), 0u,
