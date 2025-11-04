@@ -72,8 +72,7 @@ public:
 
 	void setEmail(const std::string &email) { m_email = email; }
 
-	static std::optional<Person> parsePerson(const std::string_view &src, const Role &role,
-						 unsigned int count = 0);
+	static std::optional<Person> parsePerson(const std::string_view &src, const Role &role);
 	static std::optional<Person> parse(const std::string &src)
 	{
 		for (std::size_t i = Role::FirstRole; i < Role::LastRole; ++i) {
