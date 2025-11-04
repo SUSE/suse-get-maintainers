@@ -46,16 +46,10 @@ public:
 				     " cannot be parsed into name and email!\n";
 	}
 
-	void add_backporter(const std::string_view &maintainer, int cnt,
-			    const TranslateEmail &translateEmail) {
-		if (auto m = Person::parsePerson(maintainer, Role::Maintainer, cnt)) {
-			// TODO
-			m->setEmail(translateEmail(m->email()));
-			// END TODO
-			m_maintainers.push_back(std::move(*m));
-		} else
-			std::cerr << "MAINTAINERS: contact " << maintainer <<
-				     " cannot be parsed into name and email!\n";
+	void add_backporter(const std::string &name, const std::string_view &email,
+			    unsigned cnt, const TranslateEmail &translateEmail) {
+		m_maintainers.push_back(Person(Role::Maintainer, name,
+					       /*TODO*/ translateEmail(email), cnt));
 	}
 
 	void add_maintainer_if(const std::string_view maintainer,

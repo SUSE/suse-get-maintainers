@@ -644,8 +644,7 @@ void for_all_stanzas(const SQLConn &db,
 			});
 			Stanza s("Backporter");
 			for (const auto &e: emails_and_counts_v)
-				s.add_backporter("M: Backporter <" + e.first + ">", e.second,
-						 translateEmail);
+				s.add_backporter("Backporter", e.first, e.second, translateEmail);
 			if (gm.trace)
 				std::cerr << "Backporters:" << std::endl;
 			pp(s, what);
