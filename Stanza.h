@@ -36,7 +36,7 @@ public:
 				      std::set<std::string> &suse_users,
 				      const TranslateEmail &translateEmail) {
 		if (auto m = Person::parsePerson(maintainer, Role::Maintainer)) {
-			suse_users.insert(m->email().substr(0, m->email().find_first_of("@")));
+			suse_users.insert(m->userName());
 			// TODO
 			m->setEmail(translateEmail(m->email()));
 			// END TODO
@@ -59,7 +59,7 @@ public:
 			// TODO
 			m->setEmail(translateEmail(m->email()));
 			// END TODO
-			if (suse_users.contains(m->email().substr(0, m->email().find("@"))))
+			if (suse_users.contains(m->userName()))
 				m_maintainers.push_back(std::move(*m));
 		} else
 			std::cerr << "Upstream MAINTAINERS: contact " << maintainer <<
