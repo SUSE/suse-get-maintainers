@@ -41,7 +41,7 @@ public:
 	RoleType role() const { return m_role; }
 
 	constexpr std::size_t index() const { return static_cast<std::size_t>(m_role); }
-	constexpr std::string toString() const { return roleNames[index()]; }
+	const constexpr std::string &toString() const { return roleNames[index()]; }
 private:
 	RoleType m_role;
 };
@@ -53,9 +53,9 @@ public:
 	       unsigned count = 0) :
 		m_role(r), m_name(name), m_email(email), m_count(count) {}
 
-	Role role() const { return m_role; }
-	const std::string name() const { return m_name; }
-	const std::string email() const { return m_email; }
+	const Role &role() const { return m_role; }
+	const std::string &name() const { return m_name; }
+	const std::string &email() const { return m_email; }
 	const std::string userName() const { return m_email.substr(0, m_email.find("@")); }
 	int count() const { return m_count; }
 
@@ -79,7 +79,7 @@ public:
 		for (std::size_t i = Role::FirstRole; i < Role::LastRole; ++i) {
 			Role r(i);
 			if (src.starts_with(r.toString()))
-				if (auto p = parsePerson(src, r))
+				if (auto p = parsePerson(src, std::move(r)))
 					return p;
 		}
 		return std::nullopt;
