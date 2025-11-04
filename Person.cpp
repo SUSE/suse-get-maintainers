@@ -18,35 +18,44 @@ using namespace SGM;
 std::optional<Person> Person::parsePerson(const std::string_view &src, const Role &role,
 					  unsigned count)
 {
-	std::string_view name, email;
-	auto pos = src.find_last_of("@");
-	if (pos == std::string::npos)
+	const auto atSign = src.find_last_of("@");
+	if (atSign == std::string::npos)
 		return std::nullopt;
-	auto e_sign = src.find_first_of(":");
-	if (e_sign == std::string::npos)
+
+	auto personStart = src.find_first_of(":");
+	if (personStart == std::string::npos)
 		return std::nullopt;
-	++e_sign;
-	auto b_mail = src.find_first_of("<", e_sign);
-	if (b_mail == std::string::npos)
-		if (src.find_first_of(">", e_sign) != std::string::npos)
+	++personStart;
+
+	const auto emailStart = src.find_first_of("<", personStart);
+	if (emailStart == std::string::npos) {
+		// 2nd form: no name, only e-mail
+
+		if (src.find_first_of(">", personStart) != std::string::npos)
 			return std::nullopt;
-		else {
-			email = SlHelpers::String::trim(src.substr(e_sign));
-			if (email.find_first_of(" \n\t\r") != std::string::npos)
-				return std::nullopt;
-			else {
-				return Person(role, "", std::string(email), count);
-			}
-		}
-	if (b_mail > pos)
+
+		const auto email = SlHelpers::String::trim(src.substr(personStart));
+		if (email.find_first_of(" \n\t\r") != std::string::npos)
+			return std::nullopt;
+
+		return Person(role, "", std::string(email), count);
+	}
+
+	// 1st form: name <email>
+
+	if (emailStart > atSign)
 		return std::nullopt;
-	name = SlHelpers::String::trim(src.substr(e_sign, b_mail - e_sign));
+
+	const auto name = SlHelpers::String::trim(src.substr(personStart,
+							     emailStart - personStart));
 	if (name.empty())
 		return std::nullopt;
-	auto e_mail = src.find_first_of(">", b_mail);
-	if (e_mail ==  std::string::npos || e_mail < pos)
+
+	const auto emailEnd = src.find_first_of(">", emailStart);
+	if (emailEnd == std::string::npos || emailEnd < atSign)
 		return std::nullopt;
-	email = src.substr(b_mail + 1, e_mail - b_mail - 1);
+
+	const auto email = src.substr(emailStart + 1, emailEnd - emailStart - 1);
 	if (email.empty())
 		return std::nullopt;
 
