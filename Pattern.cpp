@@ -10,7 +10,11 @@ constexpr unsigned int Pattern::pattern_weight(const std::string &pattern)
 {
 	unsigned ret = 1;
 	bool seen = false;
-	for (const char c: pattern) {
+	std::string_view pattern2{pattern};
+	// "fs/udf/" and "fs/*" would have the same weight otherwise
+	if (pattern2.ends_with('*'))
+		pattern2.remove_suffix(1);
+	for (const char c: pattern2) {
 		switch (c) {
 		case '/':
 			seen = true;

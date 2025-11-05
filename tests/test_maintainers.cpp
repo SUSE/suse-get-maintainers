@@ -27,7 +27,7 @@ void test_pattern()
 		const auto p = Pattern::create("drivers/*");
 		assert(p);
 		assert(!p->match("driver/char/a.c"));
-		assert(p->match("drivers/char/ttt/a.c") == 2);
+		assert(p->match("drivers/char/ttt/a.c") == 1);
 	}
 
 	{
