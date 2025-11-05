@@ -111,11 +111,9 @@ void test_stanza()
 
 int main()
 {
-	git_libgit2_init();
 	test_pattern();
 	test_person();
 	test_stanza();
-	git_libgit2_shutdown();
 
 	return 0;
 }

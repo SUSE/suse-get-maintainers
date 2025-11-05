@@ -2,8 +2,6 @@
 
 #include <sl/git/StrArray.h>
 
-#include <git2.h>
-
 #include "Pattern.h"
 
 using namespace SGM;
@@ -40,11 +38,11 @@ std::optional<SGM::Pattern> SGM::Pattern::create(const std::string_view &p)
 			pattern.find_first_of('*') != std::string::npos)
 		pattern.push_back('*');
 
-	git_pathspec *pathspec;
-	if (git_pathspec_new(&pathspec, SlGit::StrArray({ pattern.c_str() }))) {
+	auto pathspec = SlGit::PathSpec::create({pattern});
+	if (!pathspec) {
 		std::cerr << git_error_last()->message << '\n';
 		return std::nullopt;
 	}
 
-	return Pattern(pathspec, pattern_weight(pattern));
+	return Pattern(std::move(*pathspec), pattern_weight(pattern));
 }
