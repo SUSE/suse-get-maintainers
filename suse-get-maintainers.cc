@@ -82,6 +82,8 @@ struct gm {
 	std::string fixes;
 	std::filesystem::path conf_file_map;
 	unsigned int year;
+	bool skipSUSE;
+	bool skipUpstream;
 	bool rejected;
 	bool all_cves;
 	bool json;
@@ -239,6 +241,10 @@ void parse_options(int argc, char **argv)
 		("y,year", "Resolve all kernel CVEs from a given year; CSV output; "
 			   "use -j or --json option for JSON",
 			cxxopts::value(gm.year)->default_value("0"))
+		("skip-suse", "Skip SUSE's MAINTAINERS file",
+			cxxopts::value(gm.skipSUSE)->default_value("0"))
+		("skip-upstream", "Skip upstream's MAINTAINERS file",
+			cxxopts::value(gm.skipUpstream)->default_value("0"))
 	;
 	options.add_options("output")
 		("j,json", "Output JSON",
@@ -604,23 +610,21 @@ void for_all_stanzas(const SQLConn &db,
 		     F pp,
 		     const std::string &what)
 {
-	auto stanza = maintainers.findBestMatch(paths);
+	if (!gm.skipSUSE)
+		if (const auto stanza = maintainers.findBestMatch(paths)) {
+			if (gm.trace)
+				std::cerr << "STANZA: " << stanza->name() << std::endl;
+			pp(*stanza, what);
+			return;
+		}
 
-	if (stanza) {
-		if (gm.trace)
-			std::cerr << "STANZA: " << stanza->name() << std::endl;
-		pp(*stanza, what);
-		return;
-	}
-
-	stanza = maintainers.findBestMatchUpstream(paths);
-
-	if (stanza) {
-		if (gm.trace)
-			std::cerr << "Upstream STANZA: " << stanza->name() << std::endl;
-		pp(*stanza, what);
-		return;
-	}
+	if (!gm.skipUpstream)
+		if (const auto stanza = maintainers.findBestMatchUpstream(paths)) {
+			if (gm.trace)
+				std::cerr << "Upstream STANZA: " << stanza->name() << std::endl;
+			pp(*stanza, what);
+			return;
+		}
 
 	if (db) {
 		std::unordered_map<std::string, unsigned> emails_and_counts_m;
