@@ -919,7 +919,7 @@ void handleSHAs(const Maintainers &maintainers,
 
 	if (gm.shas.size() == 1 && gm.from_stdin && !cve_hash_map)
 		gm.shas = read_stdin_sans_new_lines();
-	const bool simple = gm.shas.size() == 1 && !gm.from_stdin && !gm.csv && !gm.json;
+	const bool simple = gm.shas.size() == 1 && !gm.csv && !gm.json;
 
 	GitHelpers::validateShas(gm.shas, cve_hash_map ? 40 : 12);
 	bool first = true;
