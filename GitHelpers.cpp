@@ -16,13 +16,15 @@ void GitHelpers::searchCommit(const SlGit::Repo &repo, const std::set<std::strin
 		if (!commit || commit->parentCount() != 1)
 			continue;
 
+		auto sha = commit->idStr();
+
 		if (!skip_signoffs) {
 			const auto sb = getSomebodyElse(*commit);
 			if (!sb.empty()) {
 				if (trace)
-					std::cerr << "SHA " << s <<
+					std::cerr << "SHA " << sha <<
 						     " contains directly our people: skipping maintainers file (suppress this with -M)!\n";
-				pp(s, sb, {});
+				pp(std::move(sha), sb, {});
 				continue;
 			}
 		}
@@ -50,7 +52,7 @@ void GitHelpers::searchCommit(const SlGit::Repo &repo, const std::set<std::strin
 			continue;
 		}
 
-		pp(s, {}, paths);
+		pp(std::move(sha), {}, paths);
 	}
 }
 
