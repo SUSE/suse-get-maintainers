@@ -366,9 +366,8 @@ void show_people(const std::vector<Person> &sb, const std::string &what, bool si
 		std::set<std::string> duplicate_set;
 		for (const Person &p: sb) {
 			std::string tmp_email = translateEmail(p.email()); // TODO
-			if (duplicate_set.contains(tmp_email))
+			if (!duplicate_set.insert(tmp_email).second)
 				continue;
-			duplicate_set.insert(tmp_email);
 			std::cout << p.pretty([&tmp_email](const std::string &) -> std::string {
 				return tmp_email;
 			}, gm.names) << '\n';
