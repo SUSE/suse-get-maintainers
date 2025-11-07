@@ -853,16 +853,6 @@ void handleDiffs(const Maintainers &maintainers, const SQLConn &db)
 				std::get<std::set<std::filesystem::path>>(s), show_emails, "");
 }
 
-void validate_cves(const std::set<std::string> &s)
-{
-	thread_local const auto regex_cve_number = std::regex("CVE-[0-9][0-9][0-9][0-9]-[0-9]+",
-							      std::regex::optimize);
-	for (const auto &str: s)
-		if (!std::regex_match(str, regex_cve_number))
-			Clr(std::cerr, Clr::YELLOW) << str <<
-						       " does not seem to be a valid CVE number";
-}
-
 void handleCVEs(std::optional<SlCVEs::CVEHashMap> &cve_hash_map)
 {
 	if (gm.vulns.empty())
@@ -881,27 +871,18 @@ void handleCVEs(std::optional<SlCVEs::CVEHashMap> &cve_hash_map)
 	if (gm.from_stdin)
 		gm.cves = read_stdin_sans_new_lines();
 
-	if (gm.cves.size() > 1) {
-		validate_cves(gm.cves);
-		for (const auto &c: gm.cves) {
-			const std::vector<std::string> shas = cve_hash_map->get_shas(c);
-			for (const std::string &s: shas) {
-				gm.shas.insert(s);
-				if (gm.trace)
-					std::cerr << "CVE(" << c << ") is SHA(" << s << ")" << std::endl;
-			}
-			if (shas.empty())
-				std::cerr << "Unable to translate CVE number (" << c << ") to SHA hash" << std::endl;
+	for (const auto &c: gm.cves) {
+		const std::vector<std::string> shas = cve_hash_map->get_shas(c);
+		if (shas.empty()) {
+			Clr(std::cerr, Clr::YELLOW) << "Unable to translate CVE number (" << c
+						    << ") to SHA hash";
+			continue;
 		}
-	} else {
-		const std::vector<std::string> shas = cve_hash_map->get_shas(*gm.cves.cbegin());
 		for (const std::string &s: shas) {
 			gm.shas.insert(s);
 			if (gm.trace)
-				std::cerr << "CVE(" << *gm.cves.cbegin() << ") is SHA(" << s << ")" << std::endl;
+				std::cerr << "CVE(" << c << ") is SHA(" << s << ")" << std::endl;
 		}
-		if (shas.empty())
-			fail_with_message("Unable to translate CVE number (", *gm.cves.cbegin(), ") to SHA hash");
 	}
 }
 
