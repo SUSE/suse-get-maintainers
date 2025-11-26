@@ -435,12 +435,12 @@ void show_people(const std::vector<Person> &sb, const std::string &what, bool si
 	}
 }
 
-bool whois(const Maintainers::MaintainersType &stanzas, const std::string &whois)
+bool whois(const Maintainers::MaintainersType &stanzas)
 {
 	bool found = false;
 	for (const auto& s: stanzas) {
 		for (const auto &p: s.maintainers())
-			if (p.email() == whois || p.email().starts_with(whois + "@")) {
+			if (p.email() == gm.whois || p.email().starts_with(gm.whois + "@")) {
 				std::cout << s.name() << "\n";
 				found = true;
 			}
@@ -448,9 +448,9 @@ bool whois(const Maintainers::MaintainersType &stanzas, const std::string &whois
 	return found;
 }
 
-bool grep(const Maintainers::MaintainersType &stanzas, const std::string &grep, bool names)
+bool grep(const Maintainers::MaintainersType &stanzas)
 {
-	const auto re = std::regex(grep, std::regex::icase | std::regex::optimize);
+	const auto re = std::regex(gm.grep, std::regex::icase | std::regex::optimize);
 	bool found = false;
 	std::unordered_set<std::string> uniqueEmails;
 	for (const auto& s: stanzas) {
@@ -462,7 +462,7 @@ bool grep(const Maintainers::MaintainersType &stanzas, const std::string &grep, 
 					if (gm.grep_names_only &&
 							!uniqueEmails.emplace(p.email()).second)
 						continue;
-					if (names)
+					if (gm.names)
 						std::cout << '"' << p.pretty(true) << '"';
 					else
 						std::cout << p.email();
@@ -472,7 +472,7 @@ bool grep(const Maintainers::MaintainersType &stanzas, const std::string &grep, 
 					found = true;
 				}
 			} catch (const std::regex_error& e) {
-				fail_with_message(grep + ": " + e.what());
+				fail_with_message(gm.grep + ": " + e.what());
 			}
 	}
 	return found;
@@ -493,10 +493,10 @@ std::string maintainer_file_name_from_subsystem(const std::string &s)
 	return ret;
 }
 
-bool fixes(const std::vector<Stanza> &stanzas, const std::string &grep, bool csv, bool trace,
-	   const SlCVEs::CVEHashMap &cve_hash_map, const SlCVEs::CVE2Bugzilla &cve_to_bugzilla)
+bool fixes(const std::vector<Stanza> &stanzas, const SlCVEs::CVEHashMap &cve_hash_map,
+	   const SlCVEs::CVE2Bugzilla &cve_to_bugzilla)
 {
-	const auto re = std::regex(grep, std::regex::icase | std::regex::optimize);
+	const auto re = std::regex(gm.fixes, std::regex::icase | std::regex::optimize);
 	bool found = false;
 	std::set<std::string> files;
 	for (const auto& s: stanzas) {
@@ -509,7 +509,7 @@ bool fixes(const std::vector<Stanza> &stanzas, const std::string &grep, bool csv
 					found = true;
 				}
 			} catch (const std::regex_error& e) {
-				fail_with_message(grep + ": " + e.what());
+				fail_with_message(gm.fixes + ": " + e.what());
 			}
 	}
 	for (const auto &mf: files) {
@@ -517,7 +517,7 @@ bool fixes(const std::vector<Stanza> &stanzas, const std::string &grep, bool csv
 									       "http://fixes.prg2.suse.org/current/" + mf,
 									       false, true,
 									       std::chrono::hours{12});
-		if (csv)
+		if (gm.csv)
 			std::cout << "commit,subsys-part,sle-versions,bsc,cve\n";
 		else
 			std::cout << "--------------------------------------------------------------------------------\n";
@@ -526,7 +526,7 @@ bool fixes(const std::vector<Stanza> &stanzas, const std::string &grep, bool csv
 			continue;
 		}
 
-		if (trace)
+		if (gm.trace)
 			std::cerr << mf_on_the_disk << '\n';
 
 		std::ifstream file{mf_on_the_disk};
@@ -546,7 +546,7 @@ bool fixes(const std::vector<Stanza> &stanzas, const std::string &grep, bool csv
 			if (SlHelpers::String::isHex(possible_sha)) {
 				possible_cve = cve_hash_map.get_cve(possible_sha);
 				csv_details[commit] = possible_sha;
-			} else if (csv) {
+			} else if (gm.csv) {
 				std::istringstream line_iss(line);
 				std::string considered, for_, version_;
 				line_iss >> considered >> for_ >> version_;
@@ -566,7 +566,7 @@ bool fixes(const std::vector<Stanza> &stanzas, const std::string &grep, bool csv
 				continue;
 			}
 
-			if (csv) {
+			if (gm.csv) {
 				const auto last_col = line.rfind(": ");
 				if (last_col != std::string::npos) {
 					csv_details[subsys] = line.substr(13, last_col - 13);
@@ -595,7 +595,7 @@ bool fixes(const std::vector<Stanza> &stanzas, const std::string &grep, bool csv
 				}
 			}
 		}
-		if (csv)
+		if (gm.csv)
 			std::cout << "\n";
 	}
 	return found;
@@ -702,24 +702,24 @@ void handleFixes(const Maintainers::MaintainersType &maintainers)
 	const auto cve_to_bugzilla = SlCVEs::CVE2Bugzilla::create(cve2bugzilla_file);
 	if (!cve_to_bugzilla)
 		fail_with_message("Couldn't load cve2bugzilla.txt");
-	if (!fixes(maintainers, gm.fixes, gm.csv, gm.trace, *cve_hash_map, *cve_to_bugzilla))
+	if (!fixes(maintainers, *cve_hash_map, *cve_to_bugzilla))
 		fail_with_message("unable to find a match for " + gm.fixes +
 				  " in maintainers or subsystems");
 }
 
 void handleWhois(const Maintainers &maintainers)
 {
-	if (!whois(maintainers.maintainers(), gm.whois))
-		if (!whois(maintainers.upstream_maintainers(), gm.whois))
-			fail_with_message("unable to find " + gm.whois + " among maintainers");
+	if (!whois(maintainers.maintainers()) &&
+			!whois(maintainers.upstream_maintainers()))
+		fail_with_message("unable to find " + gm.whois + " among maintainers");
 }
 
 void handleGrep(const Maintainers &maintainers)
 {
-	if (!grep(maintainers.maintainers(), gm.grep, gm.names))
-		if (!grep(maintainers.upstream_maintainers(), gm.grep, gm.names))
-			fail_with_message("unable to find a match for " + gm.grep +
-					  " in maintainers or subsystems");
+	if (!grep(maintainers.maintainers()) &&
+			!grep(maintainers.upstream_maintainers()))
+		fail_with_message("unable to find a match for " + gm.grep +
+				  " in maintainers or subsystems");
 }
 
 void handleRefresh()
