@@ -96,6 +96,7 @@ struct gm {
 	bool only_maintainers;
 	bool no_db;
 	bool colors;
+	bool grep_names_only;
 
 	bool from_stdin;
 } gm;
@@ -254,6 +255,9 @@ void parse_options(int argc, char **argv)
 		("a,colors_always", "Always show colors; by default, they only show when the stdout "
 				    "is connected to the teminal",
 			cxxopts::value(gm.colors)->default_value("false"))
+		("grep_names_only", "Print only names/e-mails in the --grep output; "
+				    "can still be tuned by --names",
+			cxxopts::value(gm.grep_names_only)->default_value("false"))
 		("n,names", "Include full names with the emails; by default, just emails are extracted",
 			cxxopts::value(gm.names)->default_value("false"))
 		("t,trace", "Be a bit more verbose about how we got there on STDERR",
@@ -448,17 +452,23 @@ bool grep(const Maintainers::MaintainersType &stanzas, const std::string &grep, 
 {
 	const auto re = std::regex(grep, std::regex::icase | std::regex::optimize);
 	bool found = false;
+	std::unordered_set<std::string> uniqueEmails;
 	for (const auto& s: stanzas) {
 		for (const auto &p: s.maintainers())
 			try {
 				if (std::regex_search(p.email(), re) ||
 						std::regex_search(p.name(), re) ||
 						std::regex_search(s.name(), re)) {
+					if (gm.grep_names_only &&
+							!uniqueEmails.emplace(p.email()).second)
+						continue;
 					if (names)
 						std::cout << '"' << p.pretty(true) << '"';
 					else
 						std::cout << p.email();
-					std::cout << ",\"" << s.name() << "\"\n";
+					if (!gm.grep_names_only)
+						std::cout << ",\"" << s.name() << '"';
+					std::cout << '\n';
 					found = true;
 				}
 			} catch (const std::regex_error& e) {
