@@ -342,6 +342,7 @@ bool grep(const Maintainers::MaintainersType &stanzas)
 	const auto re = std::regex(gm.grep, std::regex::icase | std::regex::optimize);
 	bool found = false;
 	std::unordered_set<std::string> uniqueEmails;
+	auto formatter = getFormatter(false);
 	for (const auto& s: stanzas) {
 		for (const auto &p: s.maintainers())
 			try {
@@ -351,19 +352,18 @@ bool grep(const Maintainers::MaintainersType &stanzas)
 					if (gm.grep_names_only &&
 							!uniqueEmails.emplace(p.email()).second)
 						continue;
-					if (gm.names)
-						std::cout << '"' << p.pretty(true) << '"';
-					else
-						std::cout << p.email();
+					formatter->newObj();
+					formatter->add("email", p.pretty(gm.names), gm.names);
 					if (!gm.grep_names_only)
-						std::cout << ",\"" << s.name() << '"';
-					std::cout << '\n';
+						formatter->add("subsystem", s.name(), true);
 					found = true;
 				}
 			} catch (const std::regex_error& e) {
 				fail_with_message(gm.grep + ": " + e.what());
 			}
 	}
+	if (found)
+		formatter->print();
 	return found;
 }
 
