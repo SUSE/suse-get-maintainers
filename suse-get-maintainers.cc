@@ -4,8 +4,6 @@
 #include <set>
 #include <optional>
 #include <cstdio>
-#include <iomanip>
-#include <getopt.h>
 #include <unistd.h>
 #include <filesystem>
 
@@ -22,6 +20,7 @@
 
 #include "GitHelpers.h"
 #include "Maintainers.h"
+#include "OutputFormatter.h"
 #include "Person.h"
 
 using namespace SGM;
@@ -316,123 +315,13 @@ void parse_options(int argc, char **argv)
 	}
 }
 
-void show_emails(const Stanza &m, const std::string &)
+std::unique_ptr<OutputFormatter> getFormatter(bool simple)
 {
-	for (const auto &p: m.maintainers())
-		std::cout << p.pretty(gm.names) << '\n';
-}
-
-void csv_output(const Stanza &m, const std::string &what)
-{
-	std::cout << what << ',' << '"' << m.name() << '"';
-	for (const auto &p: m.maintainers())
-		std::cout << ',' << p.pretty(gm.names);
-	std::cout << '\n';
-}
-
-void json_output(const Stanza &m, const std::string &what)
-{
-	std::cout << what << ',' << "\n    ";
-	Clr(Clr::BLUE) << Clr::NoNL << "\"subsystem\"";
-	std::cout << ": ";
-	Clr(Clr::GREEN) << Clr::NoNL << std::quoted(m.name());
-	std::cout << ",\n    ";
-	Clr(Clr::BLUE) << Clr::NoNL << "\"emails\"";
-	std::cout << ": [\n      ";
-	bool first = true;
-	int backport_counts = 0;
-	for (const auto &p: m.maintainers()) {
-		backport_counts += p.count();
-		if (!first)
-			std::cout << ",\n      ";
-		first = false;
-		Clr(Clr::GREEN) << Clr::NoNL << std::quoted(p.pretty(gm.names));
-	}
-	if (backport_counts > 0) {
-		std::cout << "\n    ],\n    ";
-		Clr(Clr::BLUE) << Clr::NoNL << "\"counts\"";
-		std::cout << ": [\n      ";
-		first = true;
-		for (const auto &p: m.maintainers()) {
-			if (!first)
-				std::cout << ",\n      ";
-			first = false;
-			Clr(Clr::GREEN) << Clr::NoNL << p.count();
-		}
-	}
-	std::cout << "\n    ]\n  }";
-}
-
-void show_people(const std::vector<Person> &sb, const std::string &what, bool simple)
-{
-
-	if (simple) {
-		std::set<std::string> duplicate_set;
-		for (const Person &p: sb) {
-			std::string tmp_email = translateEmail(p.email()); // TODO
-			if (!duplicate_set.insert(tmp_email).second)
-				continue;
-			std::cout << p.pretty([&tmp_email](const std::string &) -> std::string {
-				return tmp_email;
-			}, gm.names) << '\n';
-		}
-	} else if (gm.json) {
-		std::cout << what << ',' << "\n    ";
-		Clr(Clr::BLUE) << Clr::NoNL << "\"roles\"";
-		std::cout << ": [\n      ";
-		bool first = true;
-		int backport_counts = 0;
-		for (const Person &p: sb) {
-			backport_counts += p.count();
-			if (!first)
-				std::cout << ",\n      ";
-			first = false;
-			Clr(Clr::GREEN) << Clr::NoNL << std::quoted(p.role().toString());
-		}
-		std::cout << "\n    ],\n    ";
-		Clr(Clr::BLUE) << Clr::NoNL << "\"emails\"";
-		std::cout << ": [\n      ";
-		first = true;
-		for (const Person &p: sb) {
-			if (!first)
-				std::cout << ",\n      ";
-			first = false;
-			Clr(Clr::GREEN) << Clr::NoNL << std::quoted(p.pretty(translateEmail,
-									     gm.names));
-		}
-		if (backport_counts > 0) {
-			std::cout << "\n    ],\n    ";
-			Clr(Clr::BLUE) << Clr::NoNL << "\"counts\"";
-			std::cout << ": [\n      ";
-			first = true;
-			for (const Person &p: sb) {
-				if (!first)
-					std::cout << ",\n      ";
-				first = false;
-				Clr(Clr::GREEN) << Clr::NoNL << p.count();
-			}
-		}
-		std::cout << "\n    ]\n  }";
-	} else {
-		std::cout << what << ',' << '"';
-		bool first = true;
-		for (const Person &p: sb) {
-			if (!first)
-				std::cout << '/';
-			first = false;
-			std::cout << p.role().toString();
-		}
-		std::cout << '"' << ',';
-		first = true;
-		for (const Person &p: sb) {
-			if (!first)
-				std::cout << ',';
-			first = false;
-
-			std::cout << p.pretty(translateEmail, gm.names);
-		}
-		std::cout << '\n';
-	}
+	if (simple)
+		return std::make_unique<OutputFormatterSimple>(translateEmail, gm.names);
+	if (gm.json)
+		return std::make_unique<OutputFormatterJSON>(translateEmail, gm.names);
+	return std::make_unique<OutputFormatterCSV>(translateEmail, gm.names);
 }
 
 bool whois(const Maintainers::MaintainersType &stanzas)
@@ -612,18 +501,16 @@ std::set<T> read_stdin_sans_new_lines()
 	return ret;
 }
 
-template<typename F>
 void for_all_stanzas(const SQLConn &db,
 		     const Maintainers &maintainers,
 		     const std::set<std::filesystem::path> &paths,
-		     F pp,
-		     const std::string &what)
+		     OutputFormatter &formatter)
 {
 	if (!gm.skipSUSE)
 		if (const auto stanza = maintainers.findBestMatch(paths)) {
 			if (gm.trace)
 				std::cerr << "STANZA: " << stanza->name() << std::endl;
-			pp(*stanza, what);
+			formatter.addStanza(*stanza);
 			return;
 		}
 
@@ -631,7 +518,7 @@ void for_all_stanzas(const SQLConn &db,
 		if (const auto stanza = maintainers.findBestMatchUpstream(paths)) {
 			if (gm.trace)
 				std::cerr << "Upstream STANZA: " << stanza->name() << std::endl;
-			pp(*stanza, what);
+			formatter.addStanza(*stanza);
 			return;
 		}
 
@@ -660,7 +547,7 @@ void for_all_stanzas(const SQLConn &db,
 				s.add_backporter("Backporter", e.first, e.second, translateEmail);
 			if (gm.trace)
 				std::cerr << "Backporters:" << std::endl;
-			pp(s, what);
+			formatter.addStanza(s);
 			return;
 		}
 	}
@@ -669,7 +556,7 @@ void for_all_stanzas(const SQLConn &db,
 						 "kernel@suse.de"};
 	if (gm.trace)
 		std::cerr << "STANZA: " << catch_all_maintainer.name() << std::endl;
-	pp(catch_all_maintainer, what);
+	formatter.addStanza(catch_all_maintainer);
 }
 
 void handleInit()
@@ -736,28 +623,18 @@ void handlePaths(const Maintainers &maintainers, const SQLConn &db)
 		gm.paths = read_stdin_sans_new_lines<std::filesystem::path>();
 
 	if (gm.paths.size() > 1 || gm.json || gm.csv || gm.from_stdin) {
-		if (gm.json)
-			std::cout << "[\n";
-		bool first = true;
+		const auto formatter = getFormatter(false);
 		for (const auto &p: gm.paths) {
-			std::ostringstream what;
-			if (gm.json) {
-				if (!first)
-					what << ",\n";
-				first = false;
-				what << "  {\n    ";
-				Clr(what, Clr::BLUE) << Clr::NoNL << "\"path\"";
-				what << ": ";
-				Clr(what, Clr::GREEN) << Clr::NoNL << p;
-			} else
-				what << p;
-			for_all_stanzas(db, maintainers, {p},
-					gm.json ? json_output : csv_output, what.str());
+			formatter->newObj();
+			formatter->add("path", p.string(), true);
+			for_all_stanzas(db, maintainers, {p}, *formatter);
 		}
-		if (gm.json)
-			std::cout << "\n]\n";
-	} else
-		for_all_stanzas(db, maintainers, gm.paths, show_emails, "");
+		formatter->print();
+	} else {
+		const auto formatter = getFormatter(true);
+		for_all_stanzas(db, maintainers, gm.paths, *formatter);
+		formatter->print();
+	}
 }
 
 std::variant<std::set<std::filesystem::path>, std::vector<Person>>
@@ -810,10 +687,9 @@ void handleDiffs(const Maintainers &maintainers, const SQLConn &db)
 		gm.diffs = read_stdin_sans_new_lines<std::filesystem::path>();
 
 	if (gm.diffs.size() > 1 || gm.json || gm.csv || gm.from_stdin) {
-		if (gm.json)
-			std::cout << "[\n";
-		bool first = true;
+		const auto formatter = getFormatter(false);
 		for (const auto &ps: gm.diffs) {
+			formatter->newObj();
 			try {
 				auto s = get_paths_from_patch(ps, gm.only_maintainers);
 				if (gm.trace && std::holds_alternative<std::set<std::filesystem::path>>(s)) {
@@ -822,29 +698,16 @@ void handleDiffs(const Maintainers &maintainers, const SQLConn &db)
 					for (const auto &p: std::get<std::set<std::filesystem::path>>(s))
 						std::cerr << '\t' << p << std::endl;
 				}
-				std::ostringstream what;
-				if (gm.json) {
-					if (!first)
-						what << ",\n";
-					first = false;
-					what << "  {\n    ";
-					Clr(what, Clr::BLUE) << Clr::NoNL << "\"diff\"";
-					what << ": ";
-					Clr(what, Clr::GREEN) << Clr::NoNL << ps;
-				} else
-					what << ps;
+				formatter->add("diff", ps.string(), true);
 				if (std::holds_alternative<std::vector<Person>>(s)) {
-					const std::vector<Person> sb = std::get<std::vector<Person>>(s);
-					show_people(sb, what.str(), false);
+					formatter->addPeople(std::get<std::vector<Person>>(s));
 				} else
 					for_all_stanzas(db, maintainers,
 							std::get<std::set<std::filesystem::path>>(s),
-							gm.json ? json_output : csv_output,
-							what.str());
+							*formatter);
 			} catch (...) { continue; }
 		}
-		if (gm.json)
-			std::cout << "\n]\n";
+		formatter->print();
 		return;
 	}
 
@@ -855,12 +718,14 @@ void handleDiffs(const Maintainers &maintainers, const SQLConn &db)
 		for (const auto &p: std::get<std::set<std::filesystem::path>>(s))
 			std::cerr << '\t' << p << std::endl;
 	}
-	if (std::holds_alternative<std::vector<Person>>(s)) {
-		const std::vector<Person> sb = std::get<std::vector<Person>>(s);
-		show_people(sb, "", true);
-	} else
-		for_all_stanzas(db, maintainers,
-				std::get<std::set<std::filesystem::path>>(s), show_emails, "");
+
+	const auto formatter = getFormatter(true);
+	if (std::holds_alternative<std::vector<Person>>(s))
+		formatter->addPeople(std::get<std::vector<Person>>(s));
+	else
+		for_all_stanzas(db, maintainers, std::get<std::set<std::filesystem::path>>(s),
+				*formatter);
+	formatter->print();
 }
 
 void handleCVEs(std::optional<SlCVEs::CVEHashMap> &cve_hash_map)
@@ -910,15 +775,10 @@ void handleSHAs(const Maintainers &maintainers,
 
 	if (gm.shas.size() == 1 && gm.from_stdin && !cve_hash_map)
 		gm.shas = read_stdin_sans_new_lines();
-	const bool simple = gm.shas.size() == 1 && !gm.csv && !gm.json;
 
-	bool first = true;
-
-	if (gm.json)
-		std::cout << "[\n";
-
+	const auto formatter = getFormatter(gm.shas.size() == 1 && !gm.csv && !gm.json);
 	GitHelpers::searchCommit(*rkOpt, gm.shas, gm.only_maintainers, gm.trace,
-				 [&maintainers, &first, &cve_hash_map, &db, simple]
+				 [&maintainers, &cve_hash_map, &db, &formatter]
 				 (const std::string &sha, const std::vector<Person> &sb,
 				 const std::set<std::filesystem::path> &paths) {
 		if (gm.trace && !paths.empty()) {
@@ -926,37 +786,16 @@ void handleSHAs(const Maintainers &maintainers,
 			for (const auto &p: paths)
 				std::cerr << '\t' << p << '\n';
 		}
-		std::ostringstream what;
-		if (gm.json) {
-			if (!first)
-				what << ",\n";
-			first = false;
-			what << "  {\n";
-			if (cve_hash_map) {
-				what << "    ";
-				Clr(what, Clr::BLUE) << Clr::NoNL << "\"cve\"";
-				what << ": ";
-				Clr(what, Clr::GREEN) << Clr::NoNL << '"' <<
-							 cve_hash_map->get_cve(sha) << '"';
-				what << ",\n";
-			}
-			what << "    ";
-			Clr(what, Clr::BLUE) << Clr::NoNL << "\"sha\"";
-			what << ": ";
-			Clr(what, Clr::GREEN) << Clr::NoNL << '"' << sha << '"';
-		} else if (cve_hash_map)
-			what << cve_hash_map->get_cve(sha) << ',' << sha;
-		else
-			what << sha;
+		formatter->newObj();
+		if (cve_hash_map)
+			formatter->add("cve", cve_hash_map->get_cve(sha));
+		formatter->add("sha", sha);
 		if (!sb.empty()) {
-			show_people(sb, what.str(), simple);
+			formatter->addPeople(sb);
 		} else
-			for_all_stanzas(db, maintainers, paths,
-					simple ? show_emails : gm.json ? json_output : csv_output,
-					what.str());
+			for_all_stanzas(db, maintainers, paths, *formatter);
 	});
-	if (gm.json)
-		std::cout << "\n]\n";
+	formatter->print();
 }
 
 int handled_main(int argc, char **argv)

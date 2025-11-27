@@ -18,6 +18,7 @@ if host_machine.cpu_family() == 'x86_64'
 endif
 
 cxxopts = dependency('cxxopts')
+json = dependency('nlohmann_json')
 libcurl = dependency('slcurl++')
 libcves = dependency('slcves++')
 libgit2 = dependency('slgit++')
@@ -36,7 +37,7 @@ executable(prj_name,
     'Maintainers.cpp',
   ],
   link_with: sgm_lib,
-  dependencies: [ cxxopts, libcves, libcurl, libgit2, sqlite3 ],
+  dependencies: [ cxxopts, json, libcves, libcurl, libgit2, sqlite3 ],
   install: true,
 )
 
