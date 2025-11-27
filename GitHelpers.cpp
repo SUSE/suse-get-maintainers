@@ -38,7 +38,7 @@ void GitHelpers::searchCommit(const SlGit::Repo &repo, const std::set<std::strin
 
 		std::set<std::filesystem::path> paths;
 
-		const auto diff = repo.diff(*commit, *parent);
+		const auto diff = repo.diff(*parent, *commit);
 		SlGit::Diff::ForEachCB cb {
 			.file = [&paths](const git_diff_delta &delta, float) {
 				paths.insert(delta.new_file.path);
