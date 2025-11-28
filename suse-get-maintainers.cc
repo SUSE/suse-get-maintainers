@@ -637,10 +637,9 @@ void handlePaths(const Maintainers &maintainers, const SQLConn &db)
 	}
 }
 
-std::variant<std::set<std::filesystem::path>, std::vector<Person>>
+std::variant<std::set<std::filesystem::path>, Stanza::Maintainers>
 get_paths_from_patch(const std::filesystem::path &path, bool skip_signoffs)
 {
-	std::variant<std::set<std::filesystem::path>, std::vector<Person>> ret;
 	const auto path_to_patch = std::filesystem::absolute(path);
 
 	std::ifstream file(path_to_patch);
@@ -651,7 +650,7 @@ get_paths_from_patch(const std::filesystem::path &path, bool skip_signoffs)
 	thread_local const auto regex_rem = std::regex("^--- [ab]/(.+)", std::regex::optimize);
 
 	std::set<std::filesystem::path> paths;
-	std::vector<Person> people;
+	Stanza::Maintainers people;
 	bool signoffs = true;
 	std::smatch match;
 	for (std::string line; std::getline(file, line); ) {
@@ -675,10 +674,9 @@ get_paths_from_patch(const std::filesystem::path &path, bool skip_signoffs)
 			paths.insert(match.str(1));
 	}
 	if (people.empty())
-		ret = std::move(paths);
+		return paths;
 	else
-		ret = std::move(people);
-	return ret;
+		return people;
 }
 
 void handleDiffs(const Maintainers &maintainers, const SQLConn &db)
@@ -699,8 +697,8 @@ void handleDiffs(const Maintainers &maintainers, const SQLConn &db)
 						std::cerr << '\t' << p << std::endl;
 				}
 				formatter->add("diff", ps.string(), true);
-				if (std::holds_alternative<std::vector<Person>>(s)) {
-					formatter->addPeople(std::get<std::vector<Person>>(s));
+				if (std::holds_alternative<Stanza::Maintainers>(s)) {
+					formatter->addPeople(std::get<Stanza::Maintainers>(s));
 				} else
 					for_all_stanzas(db, maintainers,
 							std::get<std::set<std::filesystem::path>>(s),
@@ -720,8 +718,8 @@ void handleDiffs(const Maintainers &maintainers, const SQLConn &db)
 	}
 
 	const auto formatter = getFormatter(true);
-	if (std::holds_alternative<std::vector<Person>>(s))
-		formatter->addPeople(std::get<std::vector<Person>>(s));
+	if (std::holds_alternative<Stanza::Maintainers>(s))
+		formatter->addPeople(std::get<Stanza::Maintainers>(s));
 	else
 		for_all_stanzas(db, maintainers, std::get<std::set<std::filesystem::path>>(s),
 				*formatter);
