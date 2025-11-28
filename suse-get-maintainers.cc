@@ -684,45 +684,31 @@ void handleDiffs(const Maintainers &maintainers, const SQLConn &db)
 	if (gm.from_stdin)
 		gm.diffs = read_stdin_sans_new_lines<std::filesystem::path>();
 
-	if (gm.diffs.size() > 1 || gm.json || gm.csv || gm.from_stdin) {
-		const auto formatter = getFormatter(false);
-		for (const auto &ps: gm.diffs) {
-			formatter->newObj();
-			try {
-				auto s = get_paths_from_patch(ps, gm.only_maintainers);
-				if (gm.trace && std::holds_alternative<std::set<std::filesystem::path>>(s)) {
+	bool complex = gm.diffs.size() > 1 || gm.json || gm.csv || gm.from_stdin;
+	const auto formatter = getFormatter(!complex);
+	for (const auto &ps: gm.diffs) {
+		formatter->newObj();
+		try {
+			auto s = get_paths_from_patch(ps, gm.only_maintainers);
+			if (gm.trace && std::holds_alternative<std::set<std::filesystem::path>>(s)) {
 
-					std::cerr << "patch " << ps << " contains the following paths: " << std::endl;
-					for (const auto &p: std::get<std::set<std::filesystem::path>>(s))
-						std::cerr << '\t' << p << std::endl;
-				}
+				std::cerr << "patch " << ps << " contains the following paths: " << std::endl;
+				for (const auto &p: std::get<std::set<std::filesystem::path>>(s))
+					std::cerr << '\t' << p << std::endl;
+			}
+			if (complex)
 				formatter->add("diff", ps.string(), true);
-				if (std::holds_alternative<Stanza::Maintainers>(s)) {
-					formatter->addPeople(std::get<Stanza::Maintainers>(s));
-				} else
-					for_all_stanzas(db, maintainers,
-							std::get<std::set<std::filesystem::path>>(s),
-							*formatter);
-			} catch (...) { continue; }
+			if (std::holds_alternative<Stanza::Maintainers>(s))
+				formatter->addPeople(std::get<Stanza::Maintainers>(s));
+			else
+				for_all_stanzas(db, maintainers,
+						std::get<std::set<std::filesystem::path>>(s),
+						*formatter);
+		} catch (...) {
+			if (!complex)
+				throw;
 		}
-		formatter->print();
-		return;
 	}
-
-	auto s = get_paths_from_patch(*gm.diffs.cbegin(), gm.only_maintainers);
-	if (gm.trace && std::holds_alternative<std::set<std::filesystem::path>>(s)) {
-		std::cerr << "patch " << *gm.diffs.cbegin() << " contains the following paths: " <<
-			     std::endl;
-		for (const auto &p: std::get<std::set<std::filesystem::path>>(s))
-			std::cerr << '\t' << p << std::endl;
-	}
-
-	const auto formatter = getFormatter(true);
-	if (std::holds_alternative<Stanza::Maintainers>(s))
-		formatter->addPeople(std::get<Stanza::Maintainers>(s));
-	else
-		for_all_stanzas(db, maintainers, std::get<std::set<std::filesystem::path>>(s),
-				*formatter);
 	formatter->print();
 }
 
