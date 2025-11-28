@@ -830,7 +830,7 @@ void handleDiffs(const Maintainers &maintainers, const SQLConn &db)
 					what << "  {\n    ";
 					Clr(what, Clr::BLUE) << Clr::NoNL << "\"diff\"";
 					what << ": ";
-					Clr(what, Clr::GREEN) << Clr::NoNL << '"' << ps << '"';
+					Clr(what, Clr::GREEN) << Clr::NoNL << ps;
 				} else
 					what << ps;
 				if (std::holds_alternative<std::vector<Person>>(s)) {
