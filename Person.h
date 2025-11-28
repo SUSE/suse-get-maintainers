@@ -68,7 +68,7 @@ public:
 	std::string pretty(const T &translate, bool includeName = true) const {
 		if (includeName && !name().empty())
 			return name() + " <" + translate(email()) + ">";
-		return email();
+		return translate(email());
 	}
 
 	void setEmail(const std::string &email) { m_email = email; }
