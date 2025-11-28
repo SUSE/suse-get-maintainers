@@ -622,19 +622,15 @@ void handlePaths(const Maintainers &maintainers, const SQLConn &db)
 	if (gm.from_stdin)
 		gm.paths = read_stdin_sans_new_lines<std::filesystem::path>();
 
-	if (gm.paths.size() > 1 || gm.json || gm.csv || gm.from_stdin) {
-		const auto formatter = getFormatter(false);
-		for (const auto &p: gm.paths) {
-			formatter->newObj();
+	bool complex = gm.paths.size() > 1 || gm.json || gm.csv || gm.from_stdin;
+	const auto formatter = getFormatter(!complex);
+	for (const auto &p: gm.paths) {
+		formatter->newObj();
+		if (complex)
 			formatter->add("path", p.string(), true);
-			for_all_stanzas(db, maintainers, {p}, *formatter);
-		}
-		formatter->print();
-	} else {
-		const auto formatter = getFormatter(true);
-		for_all_stanzas(db, maintainers, gm.paths, *formatter);
-		formatter->print();
+		for_all_stanzas(db, maintainers, {p}, *formatter);
 	}
+	formatter->print();
 }
 
 std::variant<std::set<std::filesystem::path>, Stanza::Maintainers>
