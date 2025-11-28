@@ -642,13 +642,9 @@ get_paths_from_patch(const std::filesystem::path &path, bool skip_signoffs)
 	if (!file.is_open())
 		fail_with_message("Unable to open diff file: ", path_to_patch);
 
-	thread_local const auto regex_add = std::regex("^\\+\\+\\+ [ab]/(.+)", std::regex::optimize);
-	thread_local const auto regex_rem = std::regex("^--- [ab]/(.+)", std::regex::optimize);
-
 	std::set<std::filesystem::path> paths;
 	Stanza::Maintainers people;
 	bool signoffs = true;
-	std::smatch match;
 	for (std::string line; std::getline(file, line); ) {
 		line.erase(0, line.find_first_not_of(" \t"));
 		if (!skip_signoffs && signoffs) {
@@ -664,10 +660,8 @@ get_paths_from_patch(const std::filesystem::path &path, bool skip_signoffs)
 			    signoffs = false;
 		}
 
-		if (std::regex_search(line, match, regex_add))
-			paths.insert(match.str(1));
-		else if (std::regex_search(line, match, regex_rem))
-			paths.insert(match.str(1));
+		if (line.starts_with("--- a/") || line.starts_with("+++ b/"))
+			paths.insert(line.substr(6));
 	}
 	if (people.empty())
 		return paths;
