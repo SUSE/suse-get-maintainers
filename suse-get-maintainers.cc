@@ -21,6 +21,7 @@
 #include "GitHelpers.h"
 #include "Maintainers.h"
 #include "OutputFormatter.h"
+#include "PathsOrPeople.h"
 #include "Person.h"
 
 using namespace SGM;
@@ -503,7 +504,7 @@ std::set<T> read_stdin_sans_new_lines()
 
 void for_all_stanzas(const SQLConn &db,
 		     const Maintainers &maintainers,
-		     const std::set<std::filesystem::path> &paths,
+		     const PathsOrPeople::Paths &paths,
 		     OutputFormatter &formatter)
 {
 	if (!gm.skipSUSE)
@@ -633,7 +634,7 @@ void handlePaths(const Maintainers &maintainers, const SQLConn &db)
 	formatter->print();
 }
 
-std::variant<std::set<std::filesystem::path>, Stanza::Maintainers>
+PathsOrPeople
 get_paths_from_patch(const std::filesystem::path &path, bool skip_signoffs)
 {
 	const auto path_to_patch = std::filesystem::absolute(path);
@@ -642,7 +643,7 @@ get_paths_from_patch(const std::filesystem::path &path, bool skip_signoffs)
 	if (!file.is_open())
 		fail_with_message("Unable to open diff file: ", path_to_patch);
 
-	std::set<std::filesystem::path> paths;
+	PathsOrPeople::Paths paths;
 	Stanza::Maintainers people;
 	bool signoffs = true;
 	for (std::string line; std::getline(file, line); ) {
@@ -685,21 +686,18 @@ void handleDiffs(const Maintainers &maintainers, const SQLConn &db)
 	for (const auto &ps: gm.diffs) {
 		formatter->newObj();
 		try {
-			auto s = get_paths_from_patch(ps, gm.only_maintainers);
-			if (gm.trace && std::holds_alternative<std::set<std::filesystem::path>>(s)) {
-
+			const auto pop = get_paths_from_patch(ps, gm.only_maintainers);
+			if (gm.trace && pop.holdsPaths()) {
 				std::cerr << "patch " << ps << " contains the following paths: " << std::endl;
-				for (const auto &p: std::get<std::set<std::filesystem::path>>(s))
+				for (const auto &p: pop.paths())
 					std::cerr << '\t' << p << std::endl;
 			}
 			if (complex)
 				formatter->add("diff", ps.string(), true);
-			if (std::holds_alternative<Stanza::Maintainers>(s))
-				formatter->addPeople(std::get<Stanza::Maintainers>(s));
+			if (const auto people = pop.peopleOpt())
+				formatter->addPeople(*people);
 			else
-				for_all_stanzas(db, maintainers,
-						std::get<std::set<std::filesystem::path>>(s),
-						*formatter);
+				for_all_stanzas(db, maintainers, pop.paths(), *formatter);
 		} catch (...) {
 			if (!complex)
 				throw;
