@@ -383,7 +383,7 @@ std::string maintainer_file_name_from_subsystem(const std::string &s)
 	return ret;
 }
 
-bool fixes(const std::vector<Stanza> &stanzas, const SlCVEs::CVEHashMap &cve_hash_map,
+bool fixes(const Maintainers::MaintainersType &stanzas, const SlCVEs::CVEHashMap &cve_hash_map,
 	   const SlCVEs::CVE2Bugzilla &cve_to_bugzilla)
 {
 	const auto re = std::regex(gm.fixes, std::regex::icase | std::regex::optimize);
