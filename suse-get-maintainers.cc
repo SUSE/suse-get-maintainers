@@ -650,14 +650,20 @@ get_paths_from_patch(const std::filesystem::path &path, bool skip_signoffs)
 		if (!skip_signoffs && signoffs) {
 			if (line.starts_with("From") || line.starts_with("Author")) {
 				if (const auto p = Person::parsePerson(line, Role::Author))
-					if (SlHelpers::SUSE::isSUSEAddress(p->email()))
+					if (SlHelpers::SUSE::isSUSEAddress(p->email())) {
 						people.push_back(std::move(*p));
+						continue;
+					}
 			}
 			if (const auto p = Person::parse(line))
-				if (SlHelpers::SUSE::isSUSEAddress(p->email()))
+				if (SlHelpers::SUSE::isSUSEAddress(p->email())) {
 					people.push_back(std::move(*p));
-			if (line.starts_with("---"))
-			    signoffs = false;
+					continue;
+				}
+			if (line.starts_with("---")) {
+				signoffs = false;
+				continue;
+			}
 		}
 
 		if (line.starts_with("--- a/") || line.starts_with("+++ b/"))
