@@ -8,14 +8,14 @@
 #include <sl/git/Git.h>
 #include <sl/helpers/String.h>
 
+#include "PathsOrPeople.h"
 #include "Person.h"
 
 namespace SGM {
 
 class GitHelpers {
 public:
-	using SearchCallback = std::function<void (const std::string &, const std::vector<Person> &,
-						   const std::set<std::filesystem::path> &)>;
+	using SearchCallback = std::function<void (std::string sha, PathsOrPeople pop)>;
 
 	static void searchCommit(const SlGit::Repo &repo,
 				 const std::set<std::string> &shas,

@@ -19,12 +19,12 @@ void GitHelpers::searchCommit(const SlGit::Repo &repo, const std::set<std::strin
 		auto sha = commit->idStr();
 
 		if (!skip_signoffs) {
-			const auto sb = getSomebodyElse(*commit);
+			auto sb = getSomebodyElse(*commit);
 			if (!sb.empty()) {
 				if (trace)
 					std::cerr << "SHA " << sha <<
 						     " contains directly our people: skipping maintainers file (suppress this with -M)!\n";
-				pp(std::move(sha), sb, {});
+				pp(std::move(sha), std::move(sb));
 				continue;
 			}
 		}
@@ -36,7 +36,7 @@ void GitHelpers::searchCommit(const SlGit::Repo &repo, const std::set<std::strin
 			continue;
 		}
 
-		std::set<std::filesystem::path> paths;
+		PathsOrPeople::Paths paths;
 
 		const auto diff = repo.diff(*parent, *commit);
 		SlGit::Diff::ForEachCB cb {
@@ -52,7 +52,7 @@ void GitHelpers::searchCommit(const SlGit::Repo &repo, const std::set<std::strin
 			continue;
 		}
 
-		pp(std::move(sha), {}, paths);
+		pp(std::move(sha), std::move(paths));
 	}
 }
 

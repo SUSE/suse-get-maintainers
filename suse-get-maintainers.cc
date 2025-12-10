@@ -757,21 +757,20 @@ void handleSHAs(const Maintainers &maintainers,
 	const auto formatter = getFormatter(gm.shas.size() == 1 && !gm.csv && !gm.json);
 	GitHelpers::searchCommit(*rkOpt, gm.shas, gm.only_maintainers, gm.trace,
 				 [&maintainers, &cve_hash_map, &db, &formatter]
-				 (const std::string &sha, const std::vector<Person> &sb,
-				 const std::set<std::filesystem::path> &paths) {
-		if (gm.trace && !paths.empty()) {
+				 (std::string sha, PathsOrPeople pop) {
+		if (gm.trace && pop.holdsPaths()) {
 			std::cerr << "SHA " << sha << " contains the following paths: " << std::endl;
-			for (const auto &p: paths)
+			for (const auto &p: pop.paths())
 				std::cerr << '\t' << p << '\n';
 		}
 		formatter->newObj();
 		if (cve_hash_map)
 			formatter->add("cve", cve_hash_map->get_cve(sha));
 		formatter->add("sha", sha);
-		if (!sb.empty()) {
-			formatter->addPeople(sb);
+		if (const auto people = pop.peopleOpt()) {
+			formatter->addPeople(*people);
 		} else
-			for_all_stanzas(db, maintainers, paths, *formatter);
+			for_all_stanzas(db, maintainers, pop.paths(), *formatter);
 	});
 	formatter->print();
 }
