@@ -16,13 +16,13 @@
 #include <sl/helpers/Color.h>
 #include <sl/helpers/Misc.h>
 #include <sl/helpers/SUSE.h>
+#include <sl/kerncvs/Maintainers.h>
+#include <sl/kerncvs/Person.h>
 #include <sl/sqlite/SQLConn.h>
 
 #include "GitHelpers.h"
-#include "Maintainers.h"
 #include "OutputFormatter.h"
 #include "PathsOrPeople.h"
-#include "Person.h"
 
 using namespace SGM;
 using Clr = SlHelpers::Color;
@@ -325,7 +325,7 @@ std::unique_ptr<OutputFormatter> getFormatter(bool simple)
 	return std::make_unique<OutputFormatterCSV>(translateEmail, gm.names);
 }
 
-bool whois(const Maintainers::MaintainersType &stanzas)
+bool whois(const SlKernCVS::Maintainers::MaintainersType &stanzas)
 {
 	bool found = false;
 	for (const auto& s: stanzas) {
@@ -338,7 +338,7 @@ bool whois(const Maintainers::MaintainersType &stanzas)
 	return found;
 }
 
-bool grep(const Maintainers::MaintainersType &stanzas)
+bool grep(const SlKernCVS::Maintainers::MaintainersType &stanzas)
 {
 	const auto re = std::regex(gm.grep, std::regex::icase | std::regex::optimize);
 	bool found = false;
@@ -383,7 +383,8 @@ std::string maintainer_file_name_from_subsystem(const std::string &s)
 	return ret;
 }
 
-bool fixes(const Maintainers::MaintainersType &stanzas, const SlCVEs::CVEHashMap &cve_hash_map,
+bool fixes(const SlKernCVS::Maintainers::MaintainersType &stanzas,
+	   const SlCVEs::CVEHashMap &cve_hash_map,
 	   const SlCVEs::CVE2Bugzilla &cve_to_bugzilla)
 {
 	const auto re = std::regex(gm.fixes, std::regex::icase | std::regex::optimize);
@@ -503,7 +504,7 @@ std::set<T> read_stdin_sans_new_lines()
 }
 
 void for_all_stanzas(const SQLConn &db,
-		     const Maintainers &maintainers,
+		     const SlKernCVS::Maintainers &maintainers,
 		     const PathsOrPeople::Paths &paths,
 		     OutputFormatter &formatter)
 {
@@ -543,7 +544,7 @@ void for_all_stanzas(const SQLConn &db,
 				  [](const auto &a, const auto &b) {
 				return a.second > b.second;
 			});
-			Stanza s("Backporter");
+			SlKernCVS::Stanza s("Backporter");
 			for (const auto &e: emails_and_counts_v)
 				s.add_backporter("Backporter", e.first, e.second, translateEmail);
 			if (gm.trace)
@@ -553,8 +554,8 @@ void for_all_stanzas(const SQLConn &db,
 		}
 	}
 
-	thread_local Stanza catch_all_maintainer{"Base", "Kernel Developers at SUSE",
-						 "kernel@suse.de"};
+	thread_local SlKernCVS::Stanza catch_all_maintainer{"Base", "Kernel Developers at SUSE",
+							    "kernel@suse.de"};
 	if (gm.trace)
 		std::cerr << "STANZA: " << catch_all_maintainer.name() << std::endl;
 	formatter.addStanza(catch_all_maintainer);
@@ -575,7 +576,7 @@ void handleInit()
 	}
 }
 
-void handleFixes(const Maintainers::MaintainersType &maintainers)
+void handleFixes(const SlKernCVS::Maintainers::MaintainersType &maintainers)
 {
 	const auto cve_hash_map = SlCVEs::CVEHashMap::create(gm.vulns,
 							     SlCVEs::CVEHashMap::ShaSize::Short,
@@ -595,14 +596,14 @@ void handleFixes(const Maintainers::MaintainersType &maintainers)
 				  " in maintainers or subsystems");
 }
 
-void handleWhois(const Maintainers &maintainers)
+void handleWhois(const SlKernCVS::Maintainers &maintainers)
 {
 	if (!whois(maintainers.maintainers()) &&
 			!whois(maintainers.upstream_maintainers()))
 		fail_with_message("unable to find " + gm.whois + " among maintainers");
 }
 
-void handleGrep(const Maintainers &maintainers)
+void handleGrep(const SlKernCVS::Maintainers &maintainers)
 {
 	if (!grep(maintainers.maintainers()) &&
 			!grep(maintainers.upstream_maintainers()))
@@ -618,7 +619,7 @@ void handleRefresh()
 		throw 1;
 }
 
-void handlePaths(const Maintainers &maintainers, const SQLConn &db)
+void handlePaths(const SlKernCVS::Maintainers &maintainers, const SQLConn &db)
 {
 	if (gm.from_stdin)
 		gm.paths = read_stdin_sans_new_lines<std::filesystem::path>();
@@ -644,19 +645,19 @@ get_paths_from_patch(const std::filesystem::path &path, bool skip_signoffs)
 		fail_with_message("Unable to open diff file: ", path_to_patch);
 
 	PathsOrPeople::Paths paths;
-	Stanza::Maintainers people;
+	SlKernCVS::Stanza::Maintainers people;
 	bool signoffs = true;
 	for (std::string line; std::getline(file, line); ) {
 		line.erase(0, line.find_first_not_of(" \t"));
 		if (!skip_signoffs && signoffs) {
 			if (line.starts_with("From") || line.starts_with("Author")) {
-				if (const auto p = Person::parsePerson(line, Role::Author))
+				if (const auto p = SlKernCVS::Person::parsePerson(line, SlKernCVS::Role::Author))
 					if (SlHelpers::SUSE::isSUSEAddress(p->email())) {
 						people.push_back(std::move(*p));
 						continue;
 					}
 			}
-			if (const auto p = Person::parse(line))
+			if (const auto p = SlKernCVS::Person::parse(line))
 				if (SlHelpers::SUSE::isSUSEAddress(p->email())) {
 					people.push_back(std::move(*p));
 					continue;
@@ -676,7 +677,7 @@ get_paths_from_patch(const std::filesystem::path &path, bool skip_signoffs)
 		return people;
 }
 
-void handleDiffs(const Maintainers &maintainers, const SQLConn &db)
+void handleDiffs(const SlKernCVS::Maintainers &maintainers, const SQLConn &db)
 {
 	if (gm.from_stdin)
 		gm.diffs = read_stdin_sans_new_lines<std::filesystem::path>();
@@ -739,7 +740,7 @@ void handleCVEs(std::optional<SlCVEs::CVEHashMap> &cve_hash_map)
 	}
 }
 
-void handleSHAs(const Maintainers &maintainers,
+void handleSHAs(const SlKernCVS::Maintainers &maintainers,
 		const std::optional<SlCVEs::CVEHashMap> &cve_hash_map,
 		const SQLConn &db)
 {
@@ -825,7 +826,8 @@ int handled_main(int argc, char **argv)
 		if (const auto path = SlHelpers::Env::get<std::filesystem::path>("LINUX_GIT"))
 			gm.kernel_tree = *path;
 
-	const auto m = Maintainers::load(gm.maintainers, gm.kernel_tree, gm.origin, translateEmail);
+	const auto m = SlKernCVS::Maintainers::load(gm.maintainers, gm.kernel_tree, gm.origin,
+						    translateEmail);
 	if (!m)
 		throw 1;
 

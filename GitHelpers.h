@@ -5,11 +5,12 @@
 #include <string>
 #include <set>
 
-#include <sl/git/Git.h>
+#include <sl/git/Commit.h>
+#include <sl/git/Repo.h>
 #include <sl/helpers/String.h>
+#include <sl/kerncvs/Person.h>
 
 #include "PathsOrPeople.h"
-#include "Person.h"
 
 namespace SGM {
 
@@ -23,7 +24,7 @@ public:
 				 const SearchCallback &pp);
 
 private:
-	static std::vector<Person> getSomebodyElse(const SlGit::Commit &commit);
+	static std::vector<SlKernCVS::Person> getSomebodyElse(const SlGit::Commit &commit);
 };
 
 }

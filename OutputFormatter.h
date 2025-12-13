@@ -7,13 +7,15 @@
 #include <nlohmann/json.hpp>
 
 #include <sl/helpers/String.h>
-
-#include "Stanza.h"
+#include <sl/kerncvs/Stanza.h>
 
 namespace SGM {
 
 class OutputFormatter {
 public:
+	using Person = SlKernCVS::Person;
+	using Stanza = SlKernCVS::Stanza;
+
 	OutputFormatter(Stanza::TranslateEmail translateEmail, bool fullNames) :
 		m_translateEmail(std::move(translateEmail)), m_fullNames(fullNames) {}
 
@@ -32,7 +34,8 @@ class OutputFormatterJSON : public OutputFormatter {
 public:
 	using Json = nlohmann::ordered_json;
 
-	OutputFormatterJSON(const Stanza::TranslateEmail &translateEmail, bool fullNames) :
+	OutputFormatterJSON(const Stanza::TranslateEmail &translateEmail,
+			    bool fullNames) :
 		OutputFormatter(translateEmail, fullNames) {}
 
 	virtual void newObj() override {

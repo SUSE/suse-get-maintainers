@@ -22,25 +22,17 @@ json = dependency('nlohmann_json')
 libcurl = dependency('slcurl++')
 libcves = dependency('slcves++')
 libgit2 = dependency('slgit++')
+libkerncvs = dependency('slkerncvs++')
 sqlite3 = dependency('slsqlite++')
-
-sgm_lib = static_library('sgm_library', [
-    'Pattern.cpp',
-    'Person.cpp',
-])
 
 prj_name = meson.project_name()
 executable(prj_name,
   [
     prj_name + '.cc',
     'GitHelpers.cpp',
-    'Maintainers.cpp',
   ],
-  link_with: sgm_lib,
-  dependencies: [ cxxopts, json, libcves, libcurl, libgit2, sqlite3 ],
+  dependencies: [ cxxopts, json, libcves, libcurl, libgit2, libkerncvs, sqlite3 ],
   install: true,
 )
 
 install_man(prj_name + '.1')
-
-subdir('tests')

@@ -1,4 +1,5 @@
 #include <sl/git/Commit.h>
+#include <sl/git/Diff.h>
 #include <sl/helpers/Color.h>
 #include <sl/helpers/SUSE.h>
 
@@ -56,17 +57,18 @@ void GitHelpers::searchCommit(const SlGit::Repo &repo, const std::set<std::strin
 	}
 }
 
-std::vector<Person> GitHelpers::getSomebodyElse(const SlGit::Commit &commit)
+std::vector<SlKernCVS::Person> GitHelpers::getSomebodyElse(const SlGit::Commit &commit)
 {
-	std::vector<Person> ret;
+	std::vector<SlKernCVS::Person> ret;
 	const auto author = commit.author();
 	if (SlHelpers::SUSE::isSUSEAddress(author->email))
-		ret.push_back(Person(Role::Author, author->name, author->email));
+		ret.push_back(SlKernCVS::Person(SlKernCVS::Role::Author, author->name,
+						author->email));
 
 	const std::string message = commit.message();
 	std::istringstream stream(message);
 	for (std::string line; std::getline(stream, line);) {
-		if (auto p = Person::parse(line))
+		if (auto p = SlKernCVS::Person::parse(line))
 			if (SlHelpers::SUSE::isSUSEAddress(p->email()))
 				ret.push_back(std::move(*p));
 	}
