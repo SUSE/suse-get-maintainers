@@ -106,7 +106,7 @@ public:
 	}
 
 	virtual void addPeople(const Stanza::Maintainers &sb) override {
-		std::vector<std::string> roles;
+		std::vector<std::string_view> roles;
 		for (const Person &p: sb)
 			roles.push_back(p.role().toString());
 		std::ostringstream ss;
