@@ -22,6 +22,7 @@ json = dependency('nlohmann_json')
 libcurl = dependency('slcurl++')
 libcves = dependency('slcves++')
 libgit2 = dependency('slgit++')
+libhelpers = dependency('slhelpers++')
 libkerncvs = dependency('slkerncvs++')
 sqlite3 = dependency('slsqlite++')
 
@@ -31,7 +32,7 @@ executable(prj_name,
     prj_name + '.cc',
     'GitHelpers.cpp',
   ],
-  dependencies: [ cxxopts, json, libcves, libcurl, libgit2, libkerncvs, sqlite3 ],
+  dependencies: [ cxxopts, json, libcves, libcurl, libgit2, libhelpers, libkerncvs, sqlite3 ],
   install: true,
 )
 
