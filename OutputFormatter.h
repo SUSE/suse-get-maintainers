@@ -61,7 +61,7 @@ public:
 	}
 
 	virtual void print() const override {
-		std::cout << std::setw(2) << m_json;
+		std::cout << std::setw(2) << m_json << '\n';
 	}
 private:
 	void addEmailsAndCounts(const Stanza::Maintainers &sb) {
