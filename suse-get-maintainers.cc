@@ -59,7 +59,7 @@ public:
 				{ ":file", file },
 				{ ":dir", dir },
 				{ ":limit", limit },
-				}, { typeid(std::string), typeid(int) });
+			});
 	}
 
 	explicit operator bool() const { return sqlHolder.operator bool(); }
