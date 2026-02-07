@@ -18,6 +18,7 @@
 #include <sl/helpers/Misc.h>
 #include <sl/helpers/SUSE.h>
 #include <sl/kerncvs/Maintainers.h>
+#include <sl/kerncvs/Patch.h>
 #include <sl/kerncvs/Person.h>
 #include <sl/sqlite/SQLConn.h>
 
@@ -506,7 +507,7 @@ std::set<T> read_stdin_sans_new_lines()
 
 void for_all_stanzas(const SQLConn &db,
 		     const SlKernCVS::Maintainers &maintainers,
-		     const PathsOrPeople::Paths &paths,
+		     const SlKernCVS::Patch::Paths &paths,
 		     OutputFormatter &formatter)
 {
 	if (!gm.skipSUSE)
@@ -639,18 +640,13 @@ void handlePaths(const SlKernCVS::Maintainers &maintainers, const SQLConn &db)
 PathsOrPeople
 get_paths_from_patch(const std::filesystem::path &path, bool skip_signoffs)
 {
-	const auto path_to_patch = std::filesystem::absolute(path);
+	auto patch = SlKernCVS::Patch::create(path);
+	if (!patch)
+		fail_with_message(SlKernCVS::Patch::lastError());
 
-	std::ifstream file(path_to_patch);
-	if (!file.is_open())
-		fail_with_message("Unable to open diff file: ", path_to_patch);
-
-	PathsOrPeople::Paths paths;
 	SlKernCVS::Stanza::Maintainers people;
-	bool signoffs = true;
-	for (std::string line; std::getline(file, line); ) {
-		line.erase(0, line.find_first_not_of(" \t"));
-		if (!skip_signoffs && signoffs) {
+	if (!skip_signoffs) {
+		for (const auto &line: patch->header()) {
 			if (line.starts_with("From") || line.starts_with("Author")) {
 				if (const auto p = SlKernCVS::Person::parsePerson(line, SlKernCVS::Role::Author))
 					if (SlHelpers::SUSE::isSUSEAddress(p->email())) {
@@ -663,17 +659,10 @@ get_paths_from_patch(const std::filesystem::path &path, bool skip_signoffs)
 					people.push_back(std::move(*p));
 					continue;
 				}
-			if (line.starts_with("---")) {
-				signoffs = false;
-				continue;
-			}
 		}
-
-		if (line.starts_with("--- a/") || line.starts_with("+++ b/"))
-			paths.insert(line.substr(6));
 	}
 	if (people.empty())
-		return paths;
+		return patch->paths();
 	else
 		return people;
 }

@@ -1,16 +1,15 @@
 #pragma once
 
-#include <filesystem>
-#include <set>
 #include <variant>
 
+#include <sl/kerncvs/Patch.h>
 #include <sl/kerncvs/Stanza.h>
 
 namespace SGM {
 
 class PathsOrPeople {
 public:
-	using Paths = std::set<std::filesystem::path>;
+	using Paths = SlKernCVS::Patch::Paths;
 	using Maintainers = SlKernCVS::Stanza::Maintainers;
 
 	PathsOrPeople() = delete;
