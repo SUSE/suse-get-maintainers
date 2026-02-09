@@ -14,6 +14,7 @@
 #include <sl/cves/CVEHashMap.h>
 #include <sl/git/Git.h>
 #include <sl/helpers/Color.h>
+#include <sl/helpers/Exception.h>
 #include <sl/helpers/HomeDir.h>
 #include <sl/helpers/Misc.h>
 #include <sl/helpers/SUSE.h>
@@ -28,14 +29,10 @@
 
 using namespace SGM;
 using Clr = SlHelpers::Color;
+using RunEx = SlHelpers::RuntimeException;
+using SlHelpers::raise;
 
 namespace {
-
-template<typename... Args> void fail_with_message(Args&&... args)
-{
-	(std::cerr << ... << args) << std::endl;
-	throw 1;
-}
 
 class SQLConn : public SlSqlite::SQLConn {
 public:
@@ -113,7 +110,8 @@ std::size_t get_soft_limit_for_opened_files(std::size_t min_limit)
 	struct rlimit rl;
 	if (getrlimit(RLIMIT_NOFILE, &rl) == 0) {
 		if (rl.rlim_cur < min_limit)
-			fail_with_message("RLIMIT_NOFILE is less than ", min_limit, ".  Please bump it!");
+			RunEx("RLIMIT_NOFILE is less than ") << min_limit << ". Please bump it!" <<
+								raise;
 		return rl.rlim_cur;
 	}
 	Clr(std::cerr, Clr::YELLOW) << "getrlimit() failed: " << strerror(errno);
@@ -125,32 +123,34 @@ std::size_t get_soft_limit_for_opened_files(std::size_t min_limit)
 std::unordered_map<std::string, std::string> translation_table;
 bool do_not_translate = false;
 
-bool load_temporary(std::unordered_map<std::string, std::string> &h,
+void load_temporary(std::unordered_map<std::string, std::string> &h,
 		    const std::filesystem::path &filename)
 {
 	std::ifstream file{filename};
 
 	if (!file.is_open())
-		std::cerr << "Unable to open user-bugzilla-map.txt file: " << filename << '\n';
+		RunEx("Unable to open user-bugzilla-map.txt file: ") << filename << raise;
 
 	for (std::string line; getline(file, line);) {
 		if (line.empty() || line[0] == ';' || line[0] == ' ')
 			continue;
 		const auto equal_sign_idx = line.find_first_of("=");
 		if (equal_sign_idx == std::string::npos) {
-			std::cerr << "user-bugzilla-map.txt: " << line << '\n';
+			Clr(std::cerr, Clr::YELLOW) << "No equal sign in user-bugzilla-map.txt: " <<
+						       line;
 			continue;
 		}
-		const auto user = SlHelpers::String::trim(std::string_view(line).substr(0, equal_sign_idx));
-		const auto bz_user = SlHelpers::String::trim(std::string_view(line).substr(equal_sign_idx + 1));
+		std::string_view lineSV(line);
+		const auto user = SlHelpers::String::trim(lineSV.substr(0, equal_sign_idx));
+		const auto bz_user = SlHelpers::String::trim(lineSV.substr(equal_sign_idx + 1));
 		if (user.empty() || bz_user.empty()) {
-			std::cerr << "user-bugzilla-map.txt: " << line << '\n';
+			Clr(std::cerr, Clr::YELLOW) << "Bad user-bugzilla-map.txt line (" <<
+						       "user='" << user << "' bz_user='" <<
+						       bz_user << "'): " << line;
 			continue;
 		}
 		h.insert(std::make_pair(user, bz_user));
 	}
-
-	return true;
 }
 
 std::string translateEmail(const std::string_view &sv)
@@ -286,7 +286,8 @@ void parse_options(int argc, char **argv)
 		// END TODO
 		if (opts.contains("year")) {
 			if (gm.year < 1999 || gm.year > 9999)
-				fail_with_message(optarg, " is a year that doesn't make sense for CVE!");
+				RunEx(optarg) << " is a year that doesn't make sense for CVE!" <<
+						 raise;
 			gm.all_cves = true;
 		}
 
@@ -304,17 +305,17 @@ void parse_options(int argc, char **argv)
 		if (gm.cves.empty() && gm.diffs.empty() && gm.shas.empty() && gm.paths.empty() &&
 				!gm.all_cves && !gm.refresh && !gm.init && gm.whois.empty() &&
 				gm.grep.empty() && gm.fixes.empty())
-			fail_with_message("You must provide either --sha (-s), --path (-p), "
+			RunEx("You must provide either --sha (-s), --path (-p), "
 					  "--diff (-d), --cve (-c), --year (y), --all_cves (-C), "
 					  "--init (-i), --grep (-g), --whois (-w) or --fixes (-f)!  "
-					  "See --help (-h) for details!");
+					  "See --help (-h) for details!").raise();
 
 		if (gm.init && gm.kernel_tree.empty() && gm.vulns.empty())
-			fail_with_message("You must provide at least --kernel_tree (-k) or --vulns (-v) or both!");
+			RunEx("You must provide at least --kernel_tree (-k) or --vulns (-v) or both!").raise();
 	} catch (const cxxopts::exceptions::parsing &e) {
-		std::cerr << "arguments error: " << e.what() << '\n';
+		Clr(std::cerr, Clr::RED) << "arguments error: " << e.what();
 		std::cerr << options.help();
-		throw 1;
+		throw EXIT_FAILURE;
 	}
 }
 
@@ -362,7 +363,7 @@ bool grep(const SlKernCVS::Maintainers::MaintainersType &stanzas)
 					found = true;
 				}
 			} catch (const std::regex_error& e) {
-				fail_with_message(gm.grep + ": " + e.what());
+				RunEx(gm.grep) << ": " << e.what() << raise;
 			}
 	}
 	if (found)
@@ -381,7 +382,9 @@ std::string maintainer_file_name_from_subsystem(const std::string &s)
 			ret.push_back(tolower(c));
 	}
 	if (ret.empty())
-		fail_with_message("The subsystem name \"" + s + "\" is so bizarre that it ended up being empty!");
+		RunEx("The subsystem name \"") << s <<
+						  "\" is so bizarre that it ended up being empty!" <<
+						  raise;
 	return ret;
 }
 
@@ -402,7 +405,7 @@ bool fixes(const SlKernCVS::Maintainers::MaintainersType &stanzas,
 					found = true;
 				}
 			} catch (const std::regex_error& e) {
-				fail_with_message(gm.fixes + ": " + e.what());
+				RunEx(gm.fixes) << ": " << e.what() << raise;
 			}
 	}
 	for (const auto &mf: files) {
@@ -424,7 +427,7 @@ bool fixes(const SlKernCVS::Maintainers::MaintainersType &stanzas,
 
 		std::ifstream file{mf_on_the_disk};
 		if (!file.is_open())
-			fail_with_message("Unable to open file: ", mf_on_the_disk);
+			RunEx("Unable to open file: ") << mf_on_the_disk << raise;
 
 		enum {
 			commit, subsys, sle_version, bsc, cve, last
@@ -531,7 +534,7 @@ void for_all_stanzas(const SQLConn &db,
 		for (const auto &path: paths) {
 			auto mOpt = db.get_maintainers(path.filename(), path.parent_path(), 4);
 			if (!mOpt)
-				fail_with_message("Failed to query.");
+				RunEx("Failed to query maintainers: ") << db.lastError() << raise;
 			for (auto &m : *mOpt) {
 				const auto email = std::move(std::get<std::string>(m[0]));
 				const auto count = std::get<int>(m[1]);
@@ -567,13 +570,13 @@ void handleInit()
 {
 	if (!gm.kernel_tree.empty()) {
 		if (!SlGit::Repo::clone(gm.kernel_tree, "https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git"))
-			fail_with_message(git_error_last()->message);
+			RunEx("Failed to clone Linux git: ") << SlGit::Repo::lastError() << raise;
 		std::cout << "\n\nexport LINUX_GIT=" << gm.kernel_tree <<
 			     " # store into ~/.bashrc\n\n\n";
 	}
 	if (!gm.vulns.empty()) {
 		if (!SlGit::Repo::clone(gm.vulns, "https://git.kernel.org/pub/scm/linux/security/vulns.git"))
-			fail_with_message(git_error_last()->message);
+			RunEx("Failed to clone vulns git: ") << SlGit::Repo::lastError() << raise;
 		std::cout << "\n\nexport VULNS_GIT=" << gm.vulns << " # store into ~/.bashrc\n\n\n";
 	}
 }
@@ -584,7 +587,7 @@ void handleFixes(const SlKernCVS::Maintainers::MaintainersType &maintainers)
 							     SlCVEs::CVEHashMap::ShaSize::Short,
 							     gm.cve_branch, gm.year, gm.rejected);
 	if (!cve_hash_map)
-		fail_with_message("Unable to load kernel vulns database git tree: ", gm.vulns);
+		RunEx("Unable to load kernel vulns database git tree: ") << gm.vulns << raise;
 	constexpr const char cve2bugzilla_url[] = "https://gitlab.suse.de/security/cve-database/-/raw/master/data/cve2bugzilla";
 	const auto cve2bugzilla_file = SlCurl::LibCurl::fetchFileIfNeeded(gm.cacheDir / "cve2bugzilla.txt",
 									  cve2bugzilla_url,
@@ -592,33 +595,33 @@ void handleFixes(const SlKernCVS::Maintainers::MaintainersType &maintainers)
 									  std::chrono::hours{12});
 	const auto cve_to_bugzilla = SlCVEs::CVE2Bugzilla::create(cve2bugzilla_file);
 	if (!cve_to_bugzilla)
-		fail_with_message("Couldn't load cve2bugzilla.txt");
+		RunEx("Couldn't load cve2bugzilla.txt").raise();
 	if (!fixes(maintainers, *cve_hash_map, *cve_to_bugzilla))
-		fail_with_message("unable to find a match for " + gm.fixes +
-				  " in maintainers or subsystems");
+		RunEx("Unable to find a match for ") << gm.fixes <<
+							" in maintainers or subsystems" << raise;
 }
 
 void handleWhois(const SlKernCVS::Maintainers &maintainers)
 {
 	if (!whois(maintainers.maintainers()) &&
 			!whois(maintainers.upstream_maintainers()))
-		fail_with_message("unable to find " + gm.whois + " among maintainers");
+		RunEx("Unable to find ") << gm.whois << " among maintainers" << raise;
 }
 
 void handleGrep(const SlKernCVS::Maintainers &maintainers)
 {
 	if (!grep(maintainers.maintainers()) &&
 			!grep(maintainers.upstream_maintainers()))
-		fail_with_message("unable to find a match for " + gm.grep +
-				  " in maintainers or subsystems");
+		RunEx("Unable to find a match for ") << gm.grep <<
+							" in maintainers or subsystems" << raise;
 }
 
 void handleRefresh()
 {
 	if (!gm.vulns.empty() && !SlGit::Repo::update(gm.vulns, "origin"))
-		throw 1;
+		RunEx("Unable to update vulns git: ") << SlGit::Repo::lastError() << raise;
 	if (!gm.kernel_tree.empty() && !SlGit::Repo::update(gm.kernel_tree, gm.origin))
-		throw 1;
+		RunEx("Unable to update Linux git: ") << SlGit::Repo::lastError() << raise;
 }
 
 void handlePaths(const SlKernCVS::Maintainers &maintainers, const SQLConn &db)
@@ -642,7 +645,7 @@ get_paths_from_patch(const std::filesystem::path &path, bool skip_signoffs)
 {
 	auto patch = SlKernCVS::Patch::create(path);
 	if (!patch)
-		fail_with_message(SlKernCVS::Patch::lastError());
+		RunEx(SlKernCVS::Patch::lastError()).raise();
 
 	SlKernCVS::Stanza::Maintainers people;
 	if (!skip_signoffs) {
@@ -700,12 +703,12 @@ void handleDiffs(const SlKernCVS::Maintainers &maintainers, const SQLConn &db)
 void handleCVEs(std::optional<SlCVEs::CVEHashMap> &cve_hash_map)
 {
 	if (gm.vulns.empty())
-		fail_with_message("Provide a path to kernel vulns database git tree either via -v or $VULNS_GIT");
+		RunEx("Provide a path to kernel vulns database git tree either via -v or $VULNS_GIT").raise();
 
 	cve_hash_map = SlCVEs::CVEHashMap::create(gm.vulns, SlCVEs::CVEHashMap::ShaSize::Long,
 						  gm.cve_branch, gm.year, gm.rejected);
 	if (!cve_hash_map)
-		fail_with_message("Unable to load kernel vulns database git tree: ", gm.vulns);
+		RunEx("Unable to load kernel vulns database git tree: ") << gm.vulns << raise;
 
 	if (gm.all_cves) {
 		gm.cves = cve_hash_map->get_all_cves();
@@ -735,12 +738,13 @@ void handleSHAs(const SlKernCVS::Maintainers &maintainers,
 		const SQLConn &db)
 {
 	if (gm.kernel_tree.empty())
-		fail_with_message("Provide a path to mainline git kernel tree either via -k or $LINUX_GIT");
+		RunEx("Provide a path to mainline git kernel tree either via -k or $LINUX_GIT").raise();
 
 	auto rkOpt = SlGit::Repo::open(gm.kernel_tree);
 	if (!rkOpt)
-		fail_with_message("Unable load kernel tree: ", gm.kernel_tree, " (",
-				  git_error_last()->message, ")");
+		RunEx("Unable load kernel tree: ") << gm.kernel_tree <<
+						      " (" << SlGit::Repo::lastError() << ")" <<
+						      raise;
 
 	if (gm.shas.size() == 1 && gm.from_stdin && !cve_hash_map)
 		gm.shas = read_stdin_sans_new_lines();
@@ -766,7 +770,7 @@ void handleSHAs(const SlKernCVS::Maintainers &maintainers,
 	formatter->print();
 }
 
-int handled_main(int argc, char **argv)
+void handled_main(int argc, char **argv)
 {
 	std::cin.tie(nullptr);
 	std::ios::sync_with_stdio(false);
@@ -777,7 +781,7 @@ int handled_main(int argc, char **argv)
 
 	gm.cacheDir = SlHelpers::HomeDir::createCacheDir("suse-get-maintainers");
 	if (gm.cacheDir.empty())
-		fail_with_message("Unable to create a cache dir");
+		RunEx("Unable to create a cache dir").raise();
 
 	if (gm.maintainers.empty() || !std::filesystem::exists(gm.maintainers))
 		gm.maintainers = SlCurl::LibCurl::fetchFileIfNeeded(gm.cacheDir / "MAINTAINERS",
@@ -795,8 +799,7 @@ int handled_main(int argc, char **argv)
 								  "https://kerncvs.suse.de/user-bugzilla-map.txt",
 								  gm.refresh, false,
 								  std::chrono::hours{12});
-	if (!load_temporary(translation_table, temporary))
-		throw 1;
+	load_temporary(translation_table, temporary);
 	// END TODO
 
 	const std::size_t libgit2_limit_opened_files = (get_soft_limit_for_opened_files(min_total_opened_files) - tracking_fixes_opened_files) / libgit2_opened_files_factor;
@@ -806,7 +809,7 @@ int handled_main(int argc, char **argv)
 
 	if (gm.init) {
 		handleInit();
-		return 0;
+		return;
 	}
 
 	if (gm.vulns.empty())
@@ -819,21 +822,21 @@ int handled_main(int argc, char **argv)
 	const auto m = SlKernCVS::Maintainers::load(gm.maintainers, gm.kernel_tree, gm.origin,
 						    translateEmail);
 	if (!m)
-		throw 1;
+		RunEx("Cannot load maintainers").raise();
 
 	if (!gm.fixes.empty()) {
 		handleFixes(m->maintainers());
-		return 0;
+		return;
 	}
 
 	if (!gm.whois.empty()) {
 		handleWhois(*m);
-		return 0;
+		return;
 	}
 
 	if (!gm.grep.empty()) {
 		handleGrep(*m);
-		return 0;
+		return;
 	}
 
 	if (gm.refresh)
@@ -842,17 +845,17 @@ int handled_main(int argc, char **argv)
 	SQLConn db;
 	if (!gm.no_db)
 		if (!db.open(gm.conf_file_map))
-			fail_with_message("Failed to open db: ", gm.conf_file_map, ": ",
-					  db.lastError());
+			RunEx("Failed to open db: ") << gm.conf_file_map << ": " <<
+							db.lastError() << raise;
 
 	if (!gm.paths.empty()) {
 		handlePaths(*m, db);
-		return 0;
+		return;
 	}
 
 	if (!gm.diffs.empty()) {
 		handleDiffs(*m, db);
-		return 0;
+		return;
 	}
 
 	std::optional<SlCVEs::CVEHashMap> cve_hash_map;
@@ -862,10 +865,7 @@ int handled_main(int argc, char **argv)
 
 	if (!gm.shas.empty()) {
 		handleSHAs(*m, cve_hash_map, db);
-		return 0;
 	}
-
-	return 0;
 }
 
 } // namespace
@@ -873,10 +873,13 @@ int handled_main(int argc, char **argv)
 int main(int argc, char **argv)
 {
 	try {
-		return handled_main(argc, argv);
+		handled_main(argc, argv);
 	} catch (int ret) {
 		return ret;
-	} catch (...) {
-		return 42;
+	} catch (std::runtime_error &e) {
+		Clr(std::cerr, Clr::RED) << e.what();
+		return EXIT_FAILURE;
 	}
+
+	return 0;
 }
