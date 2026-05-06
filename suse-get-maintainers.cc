@@ -192,7 +192,7 @@ void parse_options(int argc, char **argv)
 			   "-k or -v or both!",
 			cxxopts::value(gm.init)->default_value("false"))
 
-		("D,no_db", "Do not fetch/process conf_file_map.sqlite db and therefore do not "
+		("D,no-db", "Do not fetch/process conf_file_map.sqlite db and therefore do not "
 			    "report backporters",
 			cxxopts::value(gm.no_db)->default_value("false"))
 	;
@@ -235,7 +235,7 @@ void parse_options(int argc, char **argv)
 		("f,fixes", "Grep maintainers (both emails and names) and subsystems and show the "
 			    "list of current fixes for the matches (EXPERIMENTAL)",
 			cxxopts::value(gm.fixes))
-		("C,all_cves", "Resolve all kernel CVEs and find owners for them; CSV output; "
+		("C,all-cves", "Resolve all kernel CVEs and find owners for them; CSV output; "
 			       "use -j or --json option for JSON",
 			cxxopts::value(gm.all_cves)->default_value("false"))
 		("R,rejected", "Query rejected CVEs instead of the published ones. "
@@ -254,19 +254,19 @@ void parse_options(int argc, char **argv)
 			cxxopts::value(gm.json)->default_value("false"))
 		("S,csv", "Output CSV",
 			cxxopts::value(gm.csv)->default_value("false"))
-		("a,colors_always", "Always show colors; by default, they only show when the stdout "
+		("a,colors-always", "Always show colors; by default, they only show when the stdout "
 				    "is connected to the teminal",
 			cxxopts::value(gm.colors)->default_value("false"))
-		("grep_names_only", "Print only names/e-mails in the --grep output; "
+		("grep-names-only", "Print only names/e-mails in the --grep output; "
 				    "can still be tuned by --names",
 			cxxopts::value(gm.grep_names_only)->default_value("false"))
 		("n,names", "Include full names with the emails; by default, just emails are extracted",
 			cxxopts::value(gm.names)->default_value("false"))
 		("t,trace", "Be a bit more verbose about how we got there on STDERR",
 			cxxopts::value(gm.trace)->default_value("false"))
-		("N,no_translation", "Do not translate to bugzilla emails",
+		("N,no-translation", "Do not translate to bugzilla emails",
 			cxxopts::value(gm.no_translation)->default_value("false"))
-		("M,only_maintainers", "Do not analyze the patches/commits; only MAINTAINERS files",
+		("M,only-maintainers", "Do not analyze the patches/commits; only MAINTAINERS files",
 			cxxopts::value(gm.only_maintainers)->default_value("false"))
 	;
 
