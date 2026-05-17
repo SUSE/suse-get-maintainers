@@ -92,7 +92,7 @@ struct gm {
 	bool refresh;
 	bool init;
 	bool no_translation;
-	bool only_maintainers;
+	bool skipHeaders;
 	bool no_db;
 	bool colors;
 	bool grep_names_only;
@@ -244,6 +244,8 @@ void parse_options(int argc, char **argv)
 		("y,year", "Resolve all kernel CVEs from a given year; CSV output; "
 			   "use -j or --json option for JSON",
 			cxxopts::value(gm.year)->default_value("0"))
+		("M,skip-headers", "Skip analysis of patches/commits' headers",
+			cxxopts::value(gm.skipHeaders)->default_value("false"))
 		("skip-suse", "Skip SUSE's MAINTAINERS file",
 			cxxopts::value(gm.skipSUSE)->default_value("0"))
 		("skip-upstream", "Skip upstream's MAINTAINERS file",
@@ -266,8 +268,6 @@ void parse_options(int argc, char **argv)
 			cxxopts::value(gm.trace)->default_value("false"))
 		("N,no-translation", "Do not translate to bugzilla emails",
 			cxxopts::value(gm.no_translation)->default_value("false"))
-		("M,only-maintainers", "Do not analyze the patches/commits; only MAINTAINERS files",
-			cxxopts::value(gm.only_maintainers)->default_value("false"))
 	;
 
 	try {
@@ -680,7 +680,7 @@ void handleDiffs(const SlKernCVS::Maintainers &maintainers, const SQLConn &db)
 	for (const auto &ps: gm.diffs) {
 		formatter->newObj();
 		try {
-			const auto pop = get_paths_from_patch(ps, gm.only_maintainers);
+			const auto pop = get_paths_from_patch(ps, gm.skipHeaders);
 			if (gm.trace && pop.holdsPaths()) {
 				std::cerr << "patch " << ps << " contains the following paths: " << std::endl;
 				for (const auto &p: pop.paths())
@@ -750,7 +750,7 @@ void handleSHAs(const SlKernCVS::Maintainers &maintainers,
 		gm.shas = read_stdin_sans_new_lines();
 
 	const auto formatter = getFormatter(gm.shas.size() == 1 && !gm.csv && !gm.json);
-	GitHelpers::searchCommit(*rkOpt, gm.shas, gm.only_maintainers, gm.trace,
+	GitHelpers::searchCommit(*rkOpt, gm.shas, gm.skipHeaders, gm.trace,
 				 [&maintainers, &cve_hash_map, &db, &formatter]
 				 (std::string sha, PathsOrPeople pop) {
 		if (gm.trace && pop.holdsPaths()) {
