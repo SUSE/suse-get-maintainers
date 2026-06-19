@@ -844,7 +844,7 @@ void handled_main(int argc, char **argv)
 
 	SQLConn db;
 	if (!gm.no_db)
-		if (!db.open(gm.conf_file_map))
+		if (!db.open(gm.conf_file_map, SlSqlite::OpenFlags::READ_ONLY))
 			RunEx("Failed to open db: ") << gm.conf_file_map << ": " <<
 							db.lastError() << raise;
 
