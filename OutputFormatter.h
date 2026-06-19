@@ -19,6 +19,8 @@ public:
 	OutputFormatter(Stanza::TranslateEmail translateEmail, bool fullNames) :
 		m_translateEmail(std::move(translateEmail)), m_fullNames(fullNames) {}
 
+	virtual ~OutputFormatter() = default;
+
 	virtual void newObj() {}
 	virtual void add(const std::string &, const std::string &, bool = false) {}
 	virtual void addStanza(const Stanza &m) = 0;
