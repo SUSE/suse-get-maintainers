@@ -2,6 +2,7 @@
 #include <sl/git/Diff.h>
 #include <sl/helpers/Color.h>
 #include <sl/helpers/SUSE.h>
+#include <sl/kerncvs/Person.h>
 
 #include "GitHelpers.h"
 
@@ -62,7 +63,7 @@ std::vector<SlKernCVS::Person> GitHelpers::getSomebodyElse(const SlGit::Commit &
 	std::vector<SlKernCVS::Person> ret;
 	const auto author = commit.author();
 	if (SlHelpers::SUSE::isSUSEAddress(author->email))
-		ret.push_back(SlKernCVS::Person(SlKernCVS::Role::Author, author->name,
+		ret.push_back(SlKernCVS::Person(SlKernCVS::RoleType::Author, author->name,
 						author->email));
 
 	const std::string message = commit.message();

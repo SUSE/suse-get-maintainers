@@ -651,7 +651,7 @@ get_paths_from_patch(const std::filesystem::path &path, bool skip_signoffs)
 	if (!skip_signoffs) {
 		for (const auto &line: patch->header()) {
 			if (line.starts_with("From") || line.starts_with("Author")) {
-				if (const auto p = SlKernCVS::Person::parsePerson(line, SlKernCVS::Role::Author))
+				if (const auto p = SlKernCVS::Person::parsePerson(line, SlKernCVS::RoleType::Author))
 					if (SlHelpers::SUSE::isSUSEAddress(p->email())) {
 						people.push_back(std::move(*p));
 						continue;
