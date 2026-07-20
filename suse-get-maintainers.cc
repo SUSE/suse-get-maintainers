@@ -819,23 +819,21 @@ void handled_main(int argc, char **argv)
 		if (const auto path = SlHelpers::Env::get<std::filesystem::path>("LINUX_GIT"))
 			gm.kernel_tree = *path;
 
-	const auto m = SlKernCVS::Maintainers::load(gm.maintainers, gm.kernel_tree, gm.origin,
-						    translateEmail);
-	if (!m)
-		RunEx("Cannot load maintainers").raise();
+	const auto m = SlKernCVS::Maintainers(gm.maintainers, gm.kernel_tree, gm.origin,
+					      translateEmail);
 
 	if (!gm.fixes.empty()) {
-		handleFixes(m->maintainers());
+		handleFixes(m.maintainers());
 		return;
 	}
 
 	if (!gm.whois.empty()) {
-		handleWhois(*m);
+		handleWhois(m);
 		return;
 	}
 
 	if (!gm.grep.empty()) {
-		handleGrep(*m);
+		handleGrep(m);
 		return;
 	}
 
@@ -849,12 +847,12 @@ void handled_main(int argc, char **argv)
 							db.lastError() << raise;
 
 	if (!gm.paths.empty()) {
-		handlePaths(*m, db);
+		handlePaths(m, db);
 		return;
 	}
 
 	if (!gm.diffs.empty()) {
-		handleDiffs(*m, db);
+		handleDiffs(m, db);
 		return;
 	}
 
@@ -864,7 +862,7 @@ void handled_main(int argc, char **argv)
 		handleCVEs(cve_hash_map);
 
 	if (!gm.shas.empty()) {
-		handleSHAs(*m, cve_hash_map, db);
+		handleSHAs(m, cve_hash_map, db);
 	}
 }
 
