@@ -433,12 +433,9 @@ void fixesDoLine(const SlCVEs::CVEHashMap &cve_hash_map,
 		const auto last_col = line.rfind(": ");
 		if (last_col != std::string::npos) {
 			csv_details[Subsys] = line.substr(13, last_col - 13);
-			const std::string replace_chars = ",;()[]{}";
-			for (size_t loc;
-			     (loc = csv_details[Subsys].find_first_of(replace_chars)) != std::string::npos;)
-				csv_details[Subsys] = csv_details[Subsys].replace(loc, 1, "");
-			for (size_t loc; (loc = csv_details[Subsys].find(": ")) != std::string::npos;)
-				csv_details[Subsys] = csv_details[Subsys].replace(loc, 2, ";");
+
+			SlHelpers::String::eraseAllOf(csv_details[Subsys], ",;()[]{}");
+			SlHelpers::String::replaceAll(csv_details[Subsys], ": ", ";");
 		}
 
 		if (!possible_cve.empty()) {
