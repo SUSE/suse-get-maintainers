@@ -388,6 +388,15 @@ std::string maintainer_file_name_from_subsystem(const std::string &s)
 	return ret;
 }
 
+enum {
+	Commit,
+	Subsys,
+	Sle_version,
+	Bsc,
+	Cve,
+	Last
+};
+
 bool fixes(const SlKernCVS::Maintainers::MaintainersType &stanzas,
 	   const SlCVEs::CVEHashMap &cve_hash_map,
 	   const SlCVEs::CVE2Bugzilla &cve_to_bugzilla)
@@ -429,11 +438,7 @@ bool fixes(const SlKernCVS::Maintainers::MaintainersType &stanzas,
 		if (!file.is_open())
 			RunEx("Unable to open file: ") << mf_on_the_disk << raise;
 
-		enum {
-			commit, subsys, sle_version, bsc, cve, last
-		};
-
-		std::string csv_details[last];
+		std::string csv_details[Last];
 		for (std::string line; getline(file, line);) {
 			std::string possible_cve;
 
@@ -441,23 +446,23 @@ bool fixes(const SlKernCVS::Maintainers::MaintainersType &stanzas,
 						line.substr(0, 12) : "nope";
 			if (SlHelpers::String::isHex(possible_sha)) {
 				possible_cve = cve_hash_map.get_cve(possible_sha);
-				csv_details[commit] = possible_sha;
+				csv_details[Commit] = possible_sha;
 			} else if (gm.csv) {
 				std::istringstream line_iss(line);
 				std::string considered, for_, version_;
 				line_iss >> considered >> for_ >> version_;
 				if(considered == "Considered" && for_ == "for") {
-					if (csv_details[sle_version] != "")
-						csv_details[sle_version] += ";";
-					csv_details[sle_version] += version_;
-				} else if (line.length() == 0 && csv_details[commit] != "") {
-					std::cout << csv_details[commit] << "," <<
-						     csv_details[subsys] << "," <<
-						     csv_details[sle_version] << "," <<
-						     csv_details[bsc] << "," <<
-						     csv_details[cve] <<
+					if (csv_details[Sle_version] != "")
+						csv_details[Sle_version] += ";";
+					csv_details[Sle_version] += version_;
+				} else if (line.length() == 0 && csv_details[Commit] != "") {
+					std::cout << csv_details[Commit] << "," <<
+						     csv_details[Subsys] << "," <<
+						     csv_details[Sle_version] << "," <<
+						     csv_details[Bsc] << "," <<
+						     csv_details[Cve] <<
 						     '\n';
-					std::fill_n(csv_details, last, "");
+					std::fill_n(csv_details, Last, "");
 				}
 				continue;
 			}
@@ -465,20 +470,20 @@ bool fixes(const SlKernCVS::Maintainers::MaintainersType &stanzas,
 			if (gm.csv) {
 				const auto last_col = line.rfind(": ");
 				if (last_col != std::string::npos) {
-					csv_details[subsys] = line.substr(13, last_col - 13);
+					csv_details[Subsys] = line.substr(13, last_col - 13);
 					const std::string replace_chars = ",;()[]{}";
-					for (size_t loc; (loc = csv_details[subsys].find_first_of(replace_chars)) != std::string::npos;)
-						csv_details[subsys] = csv_details[subsys].replace(loc, 1, "");
-					for (size_t loc; (loc = csv_details[subsys].find(": ")) != std::string::npos;)
-						csv_details[subsys] = csv_details[subsys].replace(loc, 2, ";");
+					for (size_t loc; (loc = csv_details[Subsys].find_first_of(replace_chars)) != std::string::npos;)
+						csv_details[Subsys] = csv_details[Subsys].replace(loc, 1, "");
+					for (size_t loc; (loc = csv_details[Subsys].find(": ")) != std::string::npos;)
+						csv_details[Subsys] = csv_details[Subsys].replace(loc, 2, ";");
 				}
 
 				if (!possible_cve.empty()) {
-					csv_details[cve] = possible_cve;
+					csv_details[Cve] = possible_cve;
 
 					const auto possible_bsc = cve_to_bugzilla.get_bsc(possible_cve);
 					if (!possible_bsc.empty())
-						csv_details[bsc] = possible_bsc.substr(4);
+						csv_details[Bsc] = possible_bsc.substr(4);
 				}
 			} else {
 				std::cout << line << '\n';
