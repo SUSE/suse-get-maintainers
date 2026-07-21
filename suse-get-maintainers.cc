@@ -583,11 +583,8 @@ void handleInit()
 
 void handleFixes(const SlKernCVS::Maintainers::MaintainersType &maintainers)
 {
-	const auto cve_hash_map = SlCVEs::CVEHashMap::create(gm.vulns,
-							     SlCVEs::CVEHashMap::ShaSize::Short,
-							     gm.cve_branch, gm.year, gm.rejected);
-	if (!cve_hash_map)
-		RunEx("Unable to load kernel vulns database git tree: ") << gm.vulns << raise;
+	const SlCVEs::CVEHashMap cve_hash_map(gm.vulns, SlCVEs::CVEHashMap::ShaSize::Short,
+					      gm.cve_branch, gm.year, gm.rejected);
 	constexpr const char cve2bugzilla_url[] = "https://gitlab.suse.de/security/cve-database/-/raw/master/data/cve2bugzilla";
 	const auto cve2bugzilla_file = SlCurl::LibCurl::fetchFileIfNeeded(gm.cacheDir / "cve2bugzilla.txt",
 									  cve2bugzilla_url,
@@ -596,7 +593,7 @@ void handleFixes(const SlKernCVS::Maintainers::MaintainersType &maintainers)
 	const auto cve_to_bugzilla = SlCVEs::CVE2Bugzilla::create(cve2bugzilla_file);
 	if (!cve_to_bugzilla)
 		RunEx("Couldn't load cve2bugzilla.txt").raise();
-	if (!fixes(maintainers, *cve_hash_map, *cve_to_bugzilla))
+	if (!fixes(maintainers, cve_hash_map, *cve_to_bugzilla))
 		RunEx("Unable to find a match for ") << gm.fixes <<
 							" in maintainers or subsystems" << raise;
 }
@@ -705,10 +702,8 @@ void handleCVEs(std::optional<SlCVEs::CVEHashMap> &cve_hash_map)
 	if (gm.vulns.empty())
 		RunEx("Provide a path to kernel vulns database git tree either via -v or $VULNS_GIT").raise();
 
-	cve_hash_map = SlCVEs::CVEHashMap::create(gm.vulns, SlCVEs::CVEHashMap::ShaSize::Long,
-						  gm.cve_branch, gm.year, gm.rejected);
-	if (!cve_hash_map)
-		RunEx("Unable to load kernel vulns database git tree: ") << gm.vulns << raise;
+	cve_hash_map = SlCVEs::CVEHashMap(gm.vulns, SlCVEs::CVEHashMap::ShaSize::Long,
+					  gm.cve_branch, gm.year, gm.rejected);
 
 	if (gm.all_cves) {
 		gm.cves = cve_hash_map->get_all_cves();
@@ -760,7 +755,7 @@ void handleSHAs(const SlKernCVS::Maintainers &maintainers,
 		}
 		formatter->newObj();
 		if (cve_hash_map)
-			formatter->add("cve", cve_hash_map->get_cve(sha));
+			formatter->add("cve", std::string(cve_hash_map->get_cve(sha)));
 		formatter->add("sha", sha);
 		if (const auto people = pop.peopleOpt()) {
 			formatter->addPeople(*people);
