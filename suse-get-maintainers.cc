@@ -476,7 +476,7 @@ bool fixes(const SlKernCVS::Maintainers::MaintainersType &stanzas,
 				if (!possible_cve.empty()) {
 					csv_details[cve] = possible_cve;
 
-					const std::string possible_bsc = cve_to_bugzilla.get_bsc(possible_cve);
+					const auto possible_bsc = cve_to_bugzilla.get_bsc(possible_cve);
 					if (!possible_bsc.empty())
 						csv_details[bsc] = possible_bsc.substr(4);
 				}
@@ -484,7 +484,7 @@ bool fixes(const SlKernCVS::Maintainers::MaintainersType &stanzas,
 				std::cout << line << '\n';
 				if (!possible_cve.empty()) {
 					std::cout << "        " << possible_cve;
-					const std::string possible_bsc = cve_to_bugzilla.get_bsc(possible_cve);
+					const auto possible_bsc = cve_to_bugzilla.get_bsc(possible_cve);
 					if (!possible_bsc.empty())
 						std::cout << " https://bugzilla.suse.com/show_bug.cgi?id=" <<
 							     possible_bsc.substr(4) << '\n';
@@ -590,10 +590,8 @@ void handleFixes(const SlKernCVS::Maintainers::MaintainersType &maintainers)
 									  cve2bugzilla_url,
 									  false, false,
 									  std::chrono::hours{12});
-	const auto cve_to_bugzilla = SlCVEs::CVE2Bugzilla::create(cve2bugzilla_file);
-	if (!cve_to_bugzilla)
-		RunEx("Couldn't load cve2bugzilla.txt").raise();
-	if (!fixes(maintainers, cve_hash_map, *cve_to_bugzilla))
+	const SlCVEs::CVE2Bugzilla cve_to_bugzilla(cve2bugzilla_file);
+	if (!fixes(maintainers, cve_hash_map, cve_to_bugzilla))
 		RunEx("Unable to find a match for ") << gm.fixes <<
 							" in maintainers or subsystems" << raise;
 }
