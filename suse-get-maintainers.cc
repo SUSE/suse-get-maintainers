@@ -397,6 +397,70 @@ enum {
 	Last
 };
 
+void fixesDoLine(const SlCVEs::CVEHashMap &cve_hash_map,
+	       const SlCVEs::CVE2Bugzilla &cve_to_bugzilla,
+	       std::string (&csv_details)[Last],
+	       const std::string &line)
+{
+	std::string possible_cve;
+
+	const auto possible_sha = (line.size() > 13 && line[12] == ' ') ?
+				line.substr(0, 12) : "nope";
+	if (SlHelpers::String::isHex(possible_sha)) {
+		possible_cve = cve_hash_map.get_cve(possible_sha);
+		csv_details[Commit] = possible_sha;
+	} else if (gm.csv) {
+		std::istringstream line_iss(line);
+		std::string considered, for_, version_;
+		line_iss >> considered >> for_ >> version_;
+		if(considered == "Considered" && for_ == "for") {
+			if (csv_details[Sle_version] != "")
+				csv_details[Sle_version] += ";";
+			csv_details[Sle_version] += version_;
+		} else if (line.length() == 0 && csv_details[Commit] != "") {
+			std::cout << csv_details[Commit] << "," <<
+				     csv_details[Subsys] << "," <<
+				     csv_details[Sle_version] << "," <<
+				     csv_details[Bsc] << "," <<
+				     csv_details[Cve] <<
+				     '\n';
+			std::fill_n(csv_details, Last, "");
+		}
+		return;
+	}
+
+	if (gm.csv) {
+		const auto last_col = line.rfind(": ");
+		if (last_col != std::string::npos) {
+			csv_details[Subsys] = line.substr(13, last_col - 13);
+			const std::string replace_chars = ",;()[]{}";
+			for (size_t loc;
+			     (loc = csv_details[Subsys].find_first_of(replace_chars)) != std::string::npos;)
+				csv_details[Subsys] = csv_details[Subsys].replace(loc, 1, "");
+			for (size_t loc; (loc = csv_details[Subsys].find(": ")) != std::string::npos;)
+				csv_details[Subsys] = csv_details[Subsys].replace(loc, 2, ";");
+		}
+
+		if (!possible_cve.empty()) {
+			csv_details[Cve] = possible_cve;
+
+			const auto possible_bsc = cve_to_bugzilla.get_bsc(possible_cve);
+			if (!possible_bsc.empty())
+				csv_details[Bsc] = possible_bsc.substr(4);
+		}
+		return;
+	}
+
+	std::cout << line << '\n';
+	if (!possible_cve.empty()) {
+		std::cout << "        " << possible_cve;
+		const auto possible_bsc = cve_to_bugzilla.get_bsc(possible_cve);
+		if (!possible_bsc.empty())
+			std::cout << " https://bugzilla.suse.com/show_bug.cgi?id=" <<
+				     possible_bsc.substr(4) << '\n';
+	}
+}
+
 bool fixes(const SlKernCVS::Maintainers::MaintainersType &stanzas,
 	   const SlCVEs::CVEHashMap &cve_hash_map,
 	   const SlCVEs::CVE2Bugzilla &cve_to_bugzilla)
@@ -439,63 +503,9 @@ bool fixes(const SlKernCVS::Maintainers::MaintainersType &stanzas,
 			RunEx("Unable to open file: ") << mf_on_the_disk << raise;
 
 		std::string csv_details[Last];
-		for (std::string line; getline(file, line);) {
-			std::string possible_cve;
+		for (std::string line; getline(file, line);)
+			fixesDoLine(cve_hash_map, cve_to_bugzilla, csv_details, line);
 
-			const auto possible_sha = (line.size() > 13 && line[12] == ' ') ?
-						line.substr(0, 12) : "nope";
-			if (SlHelpers::String::isHex(possible_sha)) {
-				possible_cve = cve_hash_map.get_cve(possible_sha);
-				csv_details[Commit] = possible_sha;
-			} else if (gm.csv) {
-				std::istringstream line_iss(line);
-				std::string considered, for_, version_;
-				line_iss >> considered >> for_ >> version_;
-				if(considered == "Considered" && for_ == "for") {
-					if (csv_details[Sle_version] != "")
-						csv_details[Sle_version] += ";";
-					csv_details[Sle_version] += version_;
-				} else if (line.length() == 0 && csv_details[Commit] != "") {
-					std::cout << csv_details[Commit] << "," <<
-						     csv_details[Subsys] << "," <<
-						     csv_details[Sle_version] << "," <<
-						     csv_details[Bsc] << "," <<
-						     csv_details[Cve] <<
-						     '\n';
-					std::fill_n(csv_details, Last, "");
-				}
-				continue;
-			}
-
-			if (gm.csv) {
-				const auto last_col = line.rfind(": ");
-				if (last_col != std::string::npos) {
-					csv_details[Subsys] = line.substr(13, last_col - 13);
-					const std::string replace_chars = ",;()[]{}";
-					for (size_t loc; (loc = csv_details[Subsys].find_first_of(replace_chars)) != std::string::npos;)
-						csv_details[Subsys] = csv_details[Subsys].replace(loc, 1, "");
-					for (size_t loc; (loc = csv_details[Subsys].find(": ")) != std::string::npos;)
-						csv_details[Subsys] = csv_details[Subsys].replace(loc, 2, ";");
-				}
-
-				if (!possible_cve.empty()) {
-					csv_details[Cve] = possible_cve;
-
-					const auto possible_bsc = cve_to_bugzilla.get_bsc(possible_cve);
-					if (!possible_bsc.empty())
-						csv_details[Bsc] = possible_bsc.substr(4);
-				}
-			} else {
-				std::cout << line << '\n';
-				if (!possible_cve.empty()) {
-					std::cout << "        " << possible_cve;
-					const auto possible_bsc = cve_to_bugzilla.get_bsc(possible_cve);
-					if (!possible_bsc.empty())
-						std::cout << " https://bugzilla.suse.com/show_bug.cgi?id=" <<
-							     possible_bsc.substr(4) << '\n';
-				}
-			}
-		}
 		if (gm.csv)
 			std::cout << "\n";
 	}
