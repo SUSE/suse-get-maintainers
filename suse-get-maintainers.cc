@@ -10,8 +10,8 @@
 #include <sys/resource.h>
 
 #include <sl/curl/Curl.h>
-#include <sl/cves/CVE2Bugzilla.h>
-#include <sl/cves/CVEHashMap.h>
+#include <sl/cves/CveBscMap.h>
+#include <sl/cves/CveShaMap.h>
 #include <sl/git/Git.h>
 #include <sl/helpers/Color.h>
 #include <sl/helpers/Exception.h>
@@ -397,8 +397,8 @@ enum {
 	Last
 };
 
-void fixesDoLine(const SlCVEs::CVEHashMap &cve_hash_map,
-	       const SlCVEs::CVE2Bugzilla &cve_to_bugzilla,
+void fixesDoLine(const SlCVEs::CveShaMap &cveShaMap,
+	       const SlCVEs::CveBscMap &cveBscMap,
 	       std::string (&csv_details)[Last],
 	       const std::string &line)
 {
@@ -407,7 +407,7 @@ void fixesDoLine(const SlCVEs::CVEHashMap &cve_hash_map,
 	const auto possible_sha = (line.size() > 13 && line[12] == ' ') ?
 				line.substr(0, 12) : "nope";
 	if (SlHelpers::String::isHex(possible_sha)) {
-		possible_cve = cve_hash_map.get_cve(possible_sha);
+		possible_cve = cveShaMap.getCve(possible_sha);
 		csv_details[Commit] = possible_sha;
 	} else if (gm.csv) {
 		std::istringstream line_iss(line);
@@ -441,7 +441,7 @@ void fixesDoLine(const SlCVEs::CVEHashMap &cve_hash_map,
 		if (!possible_cve.empty()) {
 			csv_details[Cve] = possible_cve;
 
-			const auto possible_bsc = cve_to_bugzilla.get_bsc(possible_cve);
+			const auto possible_bsc = cveBscMap.getBsc(possible_cve);
 			if (!possible_bsc.empty())
 				csv_details[Bsc] = possible_bsc.substr(4);
 		}
@@ -451,7 +451,7 @@ void fixesDoLine(const SlCVEs::CVEHashMap &cve_hash_map,
 	std::cout << line << '\n';
 	if (!possible_cve.empty()) {
 		std::cout << "        " << possible_cve;
-		const auto possible_bsc = cve_to_bugzilla.get_bsc(possible_cve);
+		const auto possible_bsc = cveBscMap.getBsc(possible_cve);
 		if (!possible_bsc.empty())
 			std::cout << " https://bugzilla.suse.com/show_bug.cgi?id=" <<
 				     possible_bsc.substr(4) << '\n';
@@ -459,8 +459,8 @@ void fixesDoLine(const SlCVEs::CVEHashMap &cve_hash_map,
 }
 
 bool fixes(const SlKernCVS::Maintainers::MaintainersType &stanzas,
-	   const SlCVEs::CVEHashMap &cve_hash_map,
-	   const SlCVEs::CVE2Bugzilla &cve_to_bugzilla)
+	   const SlCVEs::CveShaMap &cveShaMap,
+	   const SlCVEs::CveBscMap &cveBscMap)
 {
 	const auto re = std::regex(gm.fixes, std::regex::icase | std::regex::optimize);
 	bool found = false;
@@ -501,7 +501,7 @@ bool fixes(const SlKernCVS::Maintainers::MaintainersType &stanzas,
 
 		std::string csv_details[Last];
 		for (std::string line; getline(file, line);)
-			fixesDoLine(cve_hash_map, cve_to_bugzilla, csv_details, line);
+			fixesDoLine(cveShaMap, cveBscMap, csv_details, line);
 
 		if (gm.csv)
 			std::cout << "\n";
@@ -595,15 +595,15 @@ void handleInit()
 
 void handleFixes(const SlKernCVS::Maintainers::MaintainersType &maintainers)
 {
-	const SlCVEs::CVEHashMap cve_hash_map(gm.vulns, SlCVEs::CVEHashMap::ShaSize::Short,
+	const SlCVEs::CveShaMap cveShaMap(gm.vulns, SlCVEs::CveShaMap::ShaSize::Short,
 					      gm.cve_branch, gm.year, gm.rejected);
 	constexpr const char cve2bugzilla_url[] = "https://gitlab.suse.de/security/cve-database/-/raw/master/data/cve2bugzilla";
 	const auto cve2bugzilla_file = SlCurl::LibCurl::fetchFileIfNeeded(gm.cacheDir / "cve2bugzilla.txt",
 									  cve2bugzilla_url,
 									  false, false,
 									  std::chrono::hours{12});
-	const SlCVEs::CVE2Bugzilla cve_to_bugzilla(cve2bugzilla_file);
-	if (!fixes(maintainers, cve_hash_map, cve_to_bugzilla))
+	const SlCVEs::CveBscMap cveBscMap(cve2bugzilla_file);
+	if (!fixes(maintainers, cveShaMap, cveBscMap))
 		RunEx("Unable to find a match for ") << gm.fixes <<
 							" in maintainers or subsystems" << raise;
 }
@@ -707,16 +707,16 @@ void handleDiffs(const SlKernCVS::Maintainers &maintainers, const SQLConn &db)
 	formatter->print();
 }
 
-void handleCVEs(std::optional<SlCVEs::CVEHashMap> &cve_hash_map)
+void handleCVEs(std::optional<SlCVEs::CveShaMap> &cveShaMap)
 {
 	if (gm.vulns.empty())
 		RunEx("Provide a path to kernel vulns database git tree either via -v or $VULNS_GIT").raise();
 
-	cve_hash_map = SlCVEs::CVEHashMap(gm.vulns, SlCVEs::CVEHashMap::ShaSize::Long,
-					  gm.cve_branch, gm.year, gm.rejected);
+	cveShaMap = SlCVEs::CveShaMap(gm.vulns, SlCVEs::CveShaMap::ShaSize::Long,
+					 gm.cve_branch, gm.year, gm.rejected);
 
 	if (gm.all_cves) {
-		gm.cves = cve_hash_map->get_all_cves();
+		gm.cves = cveShaMap->getAllCves();
 		gm.from_stdin = false;
 	}
 
@@ -724,7 +724,7 @@ void handleCVEs(std::optional<SlCVEs::CVEHashMap> &cve_hash_map)
 		gm.cves = read_stdin_sans_new_lines();
 
 	for (const auto &c: gm.cves) {
-		const std::vector<std::string> shas = cve_hash_map->get_shas(c);
+		const std::vector<std::string> shas = cveShaMap->getShas(c);
 		if (shas.empty()) {
 			Clr(std::cerr, Clr::YELLOW) << "Unable to translate CVE number (" << c
 						    << ") to SHA hash";
@@ -739,7 +739,7 @@ void handleCVEs(std::optional<SlCVEs::CVEHashMap> &cve_hash_map)
 }
 
 void handleSHAs(const SlKernCVS::Maintainers &maintainers,
-		const std::optional<SlCVEs::CVEHashMap> &cve_hash_map,
+		const std::optional<SlCVEs::CveShaMap> &cveShaMap,
 		const SQLConn &db)
 {
 	if (gm.kernel_tree.empty())
@@ -751,12 +751,12 @@ void handleSHAs(const SlKernCVS::Maintainers &maintainers,
 						      " (" << SlGit::Repo::lastError() << ")" <<
 						      raise;
 
-	if (gm.shas.size() == 1 && gm.from_stdin && !cve_hash_map)
+	if (gm.shas.size() == 1 && gm.from_stdin && !cveShaMap)
 		gm.shas = read_stdin_sans_new_lines();
 
 	const auto formatter = getFormatter(gm.shas.size() == 1 && !gm.csv && !gm.json);
 	GitHelpers::searchCommit(*rkOpt, gm.shas, gm.skipHeaders, gm.trace,
-				 [&maintainers, &cve_hash_map, &db, &formatter]
+				 [&maintainers, &cveShaMap, &db, &formatter]
 				 (std::string sha, PathsOrPeople pop) {
 		if (gm.trace && pop.holdsPaths()) {
 			std::cerr << "SHA " << sha << " contains the following paths: " << std::endl;
@@ -764,8 +764,8 @@ void handleSHAs(const SlKernCVS::Maintainers &maintainers,
 				std::cerr << '\t' << p << '\n';
 		}
 		formatter->newObj();
-		if (cve_hash_map)
-			formatter->add("cve", std::string(cve_hash_map->get_cve(sha)));
+		if (cveShaMap)
+			formatter->add("cve", std::string(cveShaMap->getCve(sha)));
 		formatter->add("sha", sha);
 		if (const auto people = pop.peopleOpt()) {
 			formatter->addPeople(*people);
@@ -861,13 +861,13 @@ void handled_main(int argc, char **argv)
 		return;
 	}
 
-	std::optional<SlCVEs::CVEHashMap> cve_hash_map;
+	std::optional<SlCVEs::CveShaMap> cveShaMap;
 
 	if (!gm.cves.empty() || gm.all_cves)
-		handleCVEs(cve_hash_map);
+		handleCVEs(cveShaMap);
 
 	if (!gm.shas.empty()) {
-		handleSHAs(m, cve_hash_map, db);
+		handleSHAs(m, cveShaMap, db);
 	}
 }
 
