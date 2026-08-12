@@ -49,6 +49,8 @@ public:
 	virtual void addStanza(const Stanza &m) override {
 		auto &obj = m_json.back();
 		obj.push_back({ "subsystem", m.name() });
+		if (m.comments().size() > 0)
+			obj.push_back({ "comments", m.comments() });
 
 		addEmailsAndCounts(m.maintainers());
 	}
