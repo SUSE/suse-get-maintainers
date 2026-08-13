@@ -247,9 +247,9 @@ void parse_options(int argc, char **argv)
 		("M,skip-headers", "Skip analysis of patches/commits' headers",
 			cxxopts::value(gm.skipHeaders)->default_value("false"))
 		("skip-suse", "Skip SUSE's MAINTAINERS file",
-			cxxopts::value(gm.skipSUSE)->default_value("0"))
+			cxxopts::value(gm.skipSUSE)->default_value("false"))
 		("skip-upstream", "Skip upstream's MAINTAINERS file",
-			cxxopts::value(gm.skipUpstream)->default_value("0"))
+			cxxopts::value(gm.skipUpstream)->default_value("false"))
 	;
 	options.add_options("output")
 		("j,json", "Output JSON",
