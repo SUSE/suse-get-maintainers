@@ -793,11 +793,15 @@ void handled_main(int argc, char **argv)
 						      "https://kerncvs.suse.de/MAINTAINERS",
 						      gm.refresh, false, std::chrono::hours{12});
 
-	if (!gm.no_db)
+	if (!gm.no_db) {
+		static const std::string cfm = "https://kss.prg2.suse.org/ckf/conf_file_map.sqlite";
 		gm.conf_file_map = SlCurl::LibCurl::fetchFileIfNeeded(gm.cacheDir / "conf_file_map.sqlite",
-								      "https://kerncvs.suse.de/conf_file_map.sqlite",
+								      cfm,
 								      gm.refresh, false,
 								      std::chrono::days{7});
+		if (gm.conf_file_map.empty())
+			RunEx("Unable to fetch conf_file_map.sqlite").raise();
+	}
 
 	// TODO
 	const auto temporary = SlCurl::LibCurl::fetchFileIfNeeded(gm.cacheDir / "user-bugzilla-map.txt",
